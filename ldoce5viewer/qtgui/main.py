@@ -540,14 +540,14 @@ class MainWindow(QMainWindow):
     #----------
 
     def _playbackAudio(self, path):
-        self._getAudioData(path, lambda data: self._soundplayer.play(data))
+        self._getAudioData(path, lambda data, path: self._soundplayer.play(data))
 
     def _getAudioData(self,  path,  callback):
         (archive, name) = path.lstrip('/').split('/', 1)
         if archive in ('us_hwd_pron', 'gb_hwd_pron', 'exa_pron', 'sfx', 'sound'):
             def finished():
                 if reply.error() == QNetworkReply.NoError:
-                    callback(reply.readAll())
+                    callback(reply.readAll(), name)
 
             url = QUrl('dict:///{0}/{1}'.format(archive, name))
             reply = self._networkAccessManager.get(QNetworkRequest(url))
@@ -555,10 +555,10 @@ class MainWindow(QMainWindow):
 
     def downloadSelectedAudio(self):
         path = self._ui.webView.audioUrlToDownload.path()
-        def showSaveDialog(data):
-            filename = QFileDialog.getSaveFileName(self,  u'Save mp3',  '',  u'MP3 Files (*.mp3)')
+        def showSaveDialog(data, name):
+            filename = QFileDialog.getSaveFileName(self,  u'Save mp3',  name,  u'MP3 Files (*.mp3)')
             if filename != '':
-                file = open(filename, "w")
+                file = open(filename, "wb")
                 file.write(data)
                 file.close()
         self._getAudioData(path, showSaveDialog)
