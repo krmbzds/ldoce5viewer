@@ -26,5 +26,6 @@
     <file alias="zoom-original.png">icons/zoom-original-16.png</file>
     <file alias="zoom-out.png">icons/zoom-out-16.png</file>
     <file alias="iconblock16.png">icons/iconblock-16.png</file>
+    <file alias="anki.png">icons/anki-24.png</file>
   </qresource>
 </RCC>
