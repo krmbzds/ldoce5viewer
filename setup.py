@@ -36,7 +36,7 @@ else:
         name='LDOCE5 Viewer',
         windows = [{
             'script': 'ldoce5viewer.py',
-            'icon_resources': [(1, 'ldoce5viewer/resources/ldoce5viewer.ico')],
+            'icon_resources': [(1, 'ldoce5viewer/qtgui/resources/ldoce5viewer.ico')],
         }],
         options = {'py2exe': {
             'includes': ['sip'],
