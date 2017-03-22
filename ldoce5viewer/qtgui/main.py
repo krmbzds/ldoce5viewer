@@ -583,9 +583,6 @@ class MainWindow(QMainWindow):
             audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', meaning))
             
             header = re.sub(r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/"]*?\.mp3)" title="([^"]+)"><img src="[^"]+"></a>', r'<a class="audio" title="\2">[sound:\1]</a>', header)
-            header = re.sub(r'<span class="homnum">\d</span>', '', header)
-
-            meaning = re.sub(r'<span class="sensenum">\d+ </span>', '', meaning)            
             meaning = re.sub(r'<a class="audio" href="audio:///exa_pron/([^/"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>', r'<a class="audio" title="Play">[sound:\1]</a>', meaning)
 
             line = header + "\t" + meaning + "\n"
