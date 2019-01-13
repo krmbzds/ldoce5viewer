@@ -193,6 +193,7 @@ class WebView(QWebView):
         self.page().selectionChanged.connect(self.__onSelectionChanged)
         self.__onSelectionChanged()
         self._actionDownloadAudio = QAction(u'Download mp3',  self)
+        self._actionCopyToAnki = QAction(u'Anki',  self)
 
     def _copyAsPlainText(self):
         text = self.selectedText().strip()
@@ -214,6 +215,14 @@ class WebView(QWebView):
     def audioUrlToDownload(self):
         return self._audioUrlToDownload
 
+    @property
+    def actionCopyToAnki(self):
+        return self._actionCopyToAnki
+
+    @property
+    def copyToAnki(self):
+        return self._copyToAnki
+
     def __onSelectionChanged(self):
         text = self.selectedText()
         self._actionCopyPlain.setEnabled(bool(text))
@@ -222,7 +231,21 @@ class WebView(QWebView):
         page = self.page()
         menu = page.createStandardContextMenu()
         actions = menu.actions()
+
+        # inserts the "Copy to Anki" action
+        frame = page.frameAt(event.pos())
+        hit_test_result = frame.hitTestContent(event.pos())
         
+        header = frame.findFirstElement(".head").toOuterXml()
+        header = header.replace("\n", "")
+
+        meaning = hit_test_result.enclosingBlockElement().toOuterXml()
+        meaning = meaning.replace("\n", "")
+
+        self._copyToAnki = (header, meaning)
+        menu.insertAction(actions[0] if actions else None,
+                    self.actionCopyToAnki)
+
         # inserts the "Download audio" action
         frame = page.frameAt(event.pos())
         hit_test_result = frame.hitTestContent(event.pos())

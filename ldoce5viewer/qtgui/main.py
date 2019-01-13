@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import sys
+import re
+import os
 from operator import itemgetter
 from functools import partial
 from difflib import SequenceMatcher
@@ -540,14 +542,14 @@ class MainWindow(QMainWindow):
     #----------
 
     def _playbackAudio(self, path):
-        self._getAudioData(path, lambda data: self._soundplayer.play(data))
+        self._getAudioData(path, lambda data, path: self._soundplayer.play(data))
 
     def _getAudioData(self,  path,  callback):
         (archive, name) = path.lstrip('/').split('/', 1)
         if archive in ('us_hwd_pron', 'gb_hwd_pron', 'exa_pron', 'sfx', 'sound'):
             def finished():
                 if reply.error() == QNetworkReply.NoError:
-                    callback(reply.readAll())
+                    callback(reply.readAll(), name)
 
             url = QUrl('dict:///{0}/{1}'.format(archive, name))
             reply = self._networkAccessManager.get(QNetworkRequest(url))
@@ -555,13 +557,44 @@ class MainWindow(QMainWindow):
 
     def downloadSelectedAudio(self):
         path = self._ui.webView.audioUrlToDownload.path()
-        def showSaveDialog(data):
-            filename = QFileDialog.getSaveFileName(self,  u'Save mp3',  '',  u'MP3 Files (*.mp3)')
+        def showSaveDialog(data, name):
+            filename = QFileDialog.getSaveFileName(self,  u'Save mp3',  name,  u'MP3 Files (*.mp3)')
             if filename != '':
-                file = open(filename, "w")
+                file = open(filename, "wb")
                 file.write(data)
                 file.close()
         self._getAudioData(path, showSaveDialog)
+
+    def copyToAnki(self):
+        audio_urls = []
+
+        anki_dir = 'anki'
+        if not os.path.exists(anki_dir):
+            os.mkdir(anki_dir)
+
+        anki_media_dir = os.path.join(anki_dir, 'collection.media')
+        if not os.path.exists(anki_media_dir):
+            os.mkdir(anki_media_dir)            
+
+        with open(os.path.join(anki_dir, "anki.txt"), "a") as f:
+            header, meaning = self._ui.webView.copyToAnki
+
+            audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', header))
+            audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', meaning))
+            
+            header = re.sub(r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/"]*?\.mp3)" title="([^"]+)"><img src="[^"]+"></a>', r'<a class="audio" title="\2">[sound:\1]</a>', header)
+            meaning = re.sub(r'<a class="audio" href="audio:///exa_pron/([^/"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>', r'<a class="audio" title="Play">[sound:\1]</a>', meaning)
+
+            line = header + "\t" + meaning + "\n"
+            f.write(line.encode('UTF-8'))
+
+        def saveAudioFile(data, filename):
+            file = open(os.path.join(anki_media_dir, filename), "wb")
+            file.write(data)
+            file.close()
+
+        for path in audio_urls:
+            self._getAudioData(path, saveAudioFile)
 
     def _onWebViewLinkClicked(self, url):
         scheme = url.scheme()
@@ -1002,6 +1035,9 @@ class MainWindow(QMainWindow):
         _set_icon(ui.actionFindNext, 'go-down')
         _set_icon(ui.actionFindPrev, 'go-up')
         _set_icon(ui.actionCloseInspector, 'window-close')
+        
+        _set_icon(wv.actionCopyToAnki, 'anki')
+
         ui.actionSearchDefinitions.setIcon(QIcon())
         ui.actionSearchExamples.setIcon(QIcon())
 
@@ -1141,6 +1177,7 @@ class MainWindow(QMainWindow):
         act_conn(ui.actionAdvancedSearch, self._onAdvancedSearch)
         act_conn(wv.actionSearchText, self.searchSelectedText)
         act_conn(wv.actionDownloadAudio, self.downloadSelectedAudio)
+        act_conn(wv.actionCopyToAnki, self.copyToAnki)
         act_conn(ui.actionZoomIn, partial(self.setZoom, 1, relative=True))
         act_conn(ui.actionZoomOut, partial(self.setZoom, -1, relative=True))
         act_conn(ui.actionNormalSize, partial(self.setZoom, 0))
