@@ -1,0 +1,36 @@
+[package]
+name = "ldoce5viewer-tui"
+version = "0.1.0"
+edition = "2021"
+description = "Terminal UI viewer for the Longman Dictionary of Contemporary English 5th Edition"
+license = "GPL-3.0"
+
+[[bin]]
+name = "ldoce5viewer-tui"
+path = "src/main.rs"
+
+[lib]
+name = "ldoce5viewer_tui"
+path = "src/lib.rs"
+
+[dependencies]
+ratatui        = "0.29"
+crossterm      = { version = "0.28", features = ["event-stream"] }
+rodio          = { version = "0.20", default-features = false, features = ["symphonia-mp3"] }
+quick-xml      = "0.37"
+tantivy        = "0.22"
+serde          = { version = "1", features = ["derive"] }
+serde_json     = "1"
+memmap2        = "0.9"
+flate2         = "1"
+image          = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+viuer          = "0.9"
+unicode-normalization = "0.1"
+dirs           = "5"
+anyhow         = "1"
+thiserror      = "2"
+base64         = "0.22"
+unicode-width  = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
