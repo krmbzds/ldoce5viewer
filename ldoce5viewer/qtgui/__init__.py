@@ -1,7 +1,5 @@
 """Entry point for the application"""
 
-_SINGLEAPP_KEY = "ed437af1-0388-4e13-90e9-486bdc88c77a"
-
 import codecs
 import logging
 import os.path
@@ -18,6 +16,8 @@ from .config import get_config
 from .utils.error import MyStreamHandler, StdErrWrapper
 from .utils.singleapp import SingleApplication
 
+_SINGLEAPP_KEY = "ed437af1-0388-4e13-90e9-486bdc88c77a"
+
 if not hasattr(QLineEdit, "setPlaceholderText"):
 
     def _dummySetPlaceholderText(self, *args, **kwargs):
@@ -26,7 +26,7 @@ if not hasattr(QLineEdit, "setPlaceholderText"):
     setattr(QLineEdit, "setPlaceholderText", _dummySetPlaceholderText)
 
 
-from . import resources, ui
+from . import resources, ui  # noqa: E402, F401
 
 
 def _setup_py2exe(config):
@@ -34,7 +34,7 @@ def _setup_py2exe(config):
     log_path = os.path.join(config._config_dir, "log.txt")
     try:
         f = codecs.open(log_path, "w", encoding="utf-8")
-    except:
+    except Exception:
         pass
     else:
         sys.stderr = f

@@ -83,7 +83,7 @@ def trans_entry(data):
         poslist = head.findall("POS")
         if poslist:
             title += " ({0})".format(", ".join(_get_text_nr(pos) for pos in poslist))
-    except:
+    except Exception:
         title = ""
 
     try:
@@ -93,7 +93,7 @@ def trans_entry(data):
         pron_us = head.find('Audio[@resource="US_HWD_PRON"]')
         if pron_us is not None:
             meta["us_pron"] = pron_us.get("topic").split("/")[-1]
-    except:
+    except Exception:
         pass
 
     r.append(_build_header(["entry"], title=title, meta=meta))
@@ -202,7 +202,6 @@ def trans_examples(data):
     title = '{0} <span class="pos">{1}</span>'.format(
         root.find("exa-head/hwd").text, root.find("exa-head/pos").text
     )
-    exas = tuple
     r = []
     r.append(_build_header(["examples"]))
     r.append("<h1>{0}</h1>\n".format(title))

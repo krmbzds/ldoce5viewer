@@ -61,7 +61,7 @@ class VariationsReader(object):
     def __del__(self):
         try:
             self.close()
-        except:
+        except Exception:
             pass
 
     def close(self):
@@ -237,7 +237,7 @@ class Searcher(object):
     def __del__(self):
         try:
             self.close()
-        except:
+        except Exception:
             pass
 
     def close(self):
@@ -284,7 +284,7 @@ class Searcher(object):
                     andlist.append(parser.parse(query_str1))
                 if query_str2:
                     andlist.append(asf_parser.parse(query_str2))
-            except:
+            except Exception:
                 return []
 
             if itemtypes:

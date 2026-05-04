@@ -30,7 +30,7 @@ extra_options = {}
 # py2exe
 # --------
 try:
-    import py2exe
+    import py2exe  # noqa: F401
 except ImportError:
     pass
 else:
@@ -65,7 +65,7 @@ else:
 # py2app
 # --------
 try:
-    import py2app
+    import py2app  # noqa: F401
 except ImportError:
     pass
 else:

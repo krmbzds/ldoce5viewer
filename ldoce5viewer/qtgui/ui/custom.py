@@ -1,10 +1,19 @@
 import sys
 
-from PySide6.QtCore import *
-from PySide6.QtGui import *
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QTextDocument
 from PySide6.QtWebEngineCore import QWebEnginePage
-from PySide6.QtWebEngineWidgets import *
-from PySide6.QtWidgets import *
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import (
+    QApplication,
+    QLineEdit,
+    QListWidget,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionToolButton,
+    QStylePainter,
+    QToolButton,
+)
 
 from ...utils.text import ellipsis
 
@@ -264,7 +273,7 @@ class WebView(QWebEngineView):
             if action_copy in actions:
                 menu.insertAction(action_copy, self.actionCopyPlain)
                 menu.removeAction(action_copy)
-        except:
+        except Exception:
             pass
 
         # Inserts a separator before "Inspect Element"

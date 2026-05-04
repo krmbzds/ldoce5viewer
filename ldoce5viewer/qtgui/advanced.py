@@ -40,7 +40,7 @@ class AdvancedSearchDialog(QDialog):
         try:
             if "advancedDialogGeometry" in get_config():
                 self.restoreGeometry(get_config()["advancedDialogGeometry"])
-        except:
+        except Exception:
             pass
 
         self._update_buttons()
@@ -50,7 +50,7 @@ class AdvancedSearchDialog(QDialog):
     def closeEvent(self, event):
         try:
             get_config()["advancedDialogGeometry"] = bytes(self.saveGeometry())
-        except:
+        except Exception:
             pass
 
     def _make_filter(self):
