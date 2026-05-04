@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ldoce5viewer"
+version = "2013.04.24"
+description = "Alternative dictionary viewer for LDOCE 5"
+readme = "README.md"
+license = { text = "GPLv3+" }
+authors = [{ name = "Taku Fukada", email = "naninunenor@gmail.com" }]
+requires-python = ">=3.9"
+dependencies = [
+    "PySide6",
+    "lxml>=4.9.1",
+    "Whoosh>=2.7.4",
+]
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Education",
+]
+
+[project.scripts]
+ldoce5viewer = "ldoce5viewer.__main__:main"
+
+[project.urls]
+Homepage = "https://forward-backward.co.jp/ldoce5viewer/"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ldoce5viewer*"]
+
+# ---------------------------------------------------------------------------
+# Ruff linter configuration
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501",  # line too long — handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ldoce5viewer"]
+
+# ---------------------------------------------------------------------------
+# Pytest configuration
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"

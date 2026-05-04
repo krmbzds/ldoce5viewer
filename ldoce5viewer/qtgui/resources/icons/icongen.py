@@ -1,8 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter
 
 OFFSET_S = 4
 OFFSET_H = 4
@@ -11,22 +11,22 @@ OFFSET_H = 4
 def cast_gradation(img, b1, b2):
     (w, h) = img.size
     pix = img.load()
-    for y in xrange(h):
+    for y in range(h):
         c = b1 + (b2 - b1) * (float(y) / (h - 1))
-        for x in xrange(w):
+        for x in range(w):
             pix[x, y] += int(c + 0.5)
     return img
 
 
 def make_inset_shadow(alpha):
     mc = alpha.copy()
-    for i in xrange(6):
+    for i in range(6):
         mc = mc.filter(ImageFilter.SMOOTH_MORE)
     mc = ImageChops.subtract(alpha, mc)
     mcb = ImageEnhance.Brightness(mc).enhance(0.35)
 
     m1 = alpha.copy()
-    for i in xrange(6):
+    for i in range(6):
         m1 = m1.filter(ImageFilter.SMOOTH_MORE)
     m1 = ImageChops.offset(m1, 0, OFFSET_S)
     m1 = ImageChops.subtract(alpha, m1)
@@ -39,13 +39,13 @@ def make_inset_shadow(alpha):
 
 def make_highlight(alpha):
     mc = alpha.copy()
-    for i in xrange(3):
+    for i in range(3):
         mc = mc.filter(ImageFilter.SMOOTH_MORE)
     mc = ImageChops.subtract(mc, alpha)
     mcb = ImageEnhance.Brightness(mc).enhance(0.35)
 
     m1 = alpha.copy()
-    for i in xrange(2):
+    for i in range(2):
         m1 = m1.filter(ImageFilter.SMOOTH_MORE)
     m1 = ImageChops.offset(m1, 0, OFFSET_H)
     m1 = ImageChops.subtract(m1, alpha)

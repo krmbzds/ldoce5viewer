@@ -8,17 +8,6 @@ _read_2L = _struct_2L.unpack
 _write_2L = _struct_2L.pack
 _read_512L = Struct(b"<512L").unpack
 
-try:
-    import __builtin__
-
-    range = __builtin__.xrange
-except ImportError:
-    pass
-
-import itertools
-
-zip = getattr(itertools, "izip", zip)
-
 
 def hashfunc(s):
     h = 5381
@@ -52,7 +41,7 @@ class CDBReader(object):
     def __del__(self):
         try:
             self.close()
-        except:
+        except Exception:
             pass
 
     def close(self):
@@ -83,10 +72,8 @@ class CDBReader(object):
                     # not exist
                     break
                 if h == hashed:
-                    print(h, p)
                     pk = p + 8
                     (klen, vlen) = _read_2L(mm[p:pk])
-                    print(klen, vlen)
                     pv = pk + klen
                     if key == mm[pk:pv]:
                         return mm[pv : (pv + vlen)]
