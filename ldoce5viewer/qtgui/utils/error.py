@@ -2,8 +2,8 @@
 
 from logging import StreamHandler
 
-from PyQt4.QtCore import QMutex, QObject, pyqtSignal
-from PyQt4.QtGui import QPlainTextEdit
+from PySide6.QtCore import QRecursiveMutex, QObject, Signal
+from PySide6.QtWidgets import QPlainTextEdit
 
 
 class MyStreamHandler(StreamHandler):
@@ -12,7 +12,7 @@ class MyStreamHandler(StreamHandler):
 
     def createLock(self):
         # must be Recursive (= reentrant)
-        self._mutex = QMutex(QMutex.Recursive)
+        self._mutex = QRecursiveMutex()
 
     def acquire(self):
         self._mutex.lock()
@@ -22,27 +22,28 @@ class MyStreamHandler(StreamHandler):
 
 
 class StdErrWrapper(QObject):
-    _write = pyqtSignal(type(u''))
-    _flush = pyqtSignal()
+    _write = Signal(type(u""))
+    _flush = Signal()
 
     def __init__(self, old_stderr):
         QObject.__init__(self)
         self._old_stderr = old_stderr
         self._widget = None
-        self._mutex = QMutex(QMutex.Recursive)
+        self._mutex = QRecursiveMutex()
 
     def setApplication(self, app):
-        assert(self._widget is None)
+        assert self._widget is None
 
         widget = QPlainTextEdit()
         widget.setWindowTitle(u"Error Console")
         widget.resize(486, 300)
         widget.appendHtml(
             u'<span style="color: green">'
-            u'An unhandled error occurred.<br>'
-            u'Sorry for the inconvinience.<br>'
-            u'Please copy the following text into a bug report:<br><br>'
-            u'</span>')
+            u"An unhandled error occurred.<br>"
+            u"Sorry for the inconvinience.<br>"
+            u"Please copy the following text into a bug report:<br><br>"
+            u"</span>"
+        )
         app.aboutToQuit.connect(self.restoreStdErr)
         self._write.connect(self._write_handler)
         self._flush.connect(self._flush_handler)
@@ -70,13 +71,13 @@ class StdErrWrapper(QObject):
 
     @property
     def encoding(self):
-        return 'utf-8'
+        return "utf-8"
 
     def write(self, s):
         self._mutex.lock()
         if self._widget:
             if isinstance(s, bytes):
-                s = s.decode('utf-8', 'replace')
+                s = s.decode("utf-8", "replace")
             self._write.emit(s)
         else:
             self._old_stderr.write(s)
