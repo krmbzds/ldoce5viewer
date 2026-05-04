@@ -22,9 +22,7 @@ def _fallback(fontnames):
 def css_replace_fontfamily(text):
     def replace_func(m):
         families = (s.strip().strip("\"'") for s in m.group(2).split(","))
-        return "".join(
-            (m.group(1), 'font-family: "', _fallback(families), '"', m.group(3))
-        )
+        return "".join((m.group(1), 'font-family: "', _fallback(families), '"', m.group(3)))
 
     return re.sub(
         r"({|;)\s*font-family\s*:\s*(.*?)(;|})",

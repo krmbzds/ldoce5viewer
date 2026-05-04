@@ -34,28 +34,34 @@ try:
 except ImportError:
     pass
 else:
-    extra_options.update(dict(
-        name='LDOCE5 Viewer',
-        windows = [{
-            'script': 'ldoce5viewer.py',
-            'icon_resources': [(1, 'ldoce5viewer/qtgui/resources/ldoce5viewer.ico')],
-        }],
-        options = {'py2exe': {
-            'includes': ['sip'],
-            'packages': ['lxml.etree', 'gzip', 'lxml._elementpath'],
-            #'excludes': ['_ssl', 'ssl', 'bz2', 'sqlite3', 'select',
-            #             'xml', 'unittest', 'email', 'distutils', 'xmlrpclib',
-            #             'doctest', 'pdb', 'tarfile'],
-            'compressed': True,
-            'optimize': 2,
-            'bundle_files': 3,
-            'dist_dir': 'exedist',
-            }},
-        zipfile=None
-        ))
+    extra_options.update(
+        dict(
+            name="LDOCE5 Viewer",
+            windows=[
+                {
+                    "script": "ldoce5viewer.py",
+                    "icon_resources": [(1, "ldoce5viewer/qtgui/resources/ldoce5viewer.ico")],
+                }
+            ],
+            options={
+                "py2exe": {
+                    "includes": ["sip"],
+                    "packages": ["lxml.etree", "gzip", "lxml._elementpath"],
+                    #'excludes': ['_ssl', 'ssl', 'bz2', 'sqlite3', 'select',
+                    #             'xml', 'unittest', 'email', 'distutils', 'xmlrpclib',
+                    #             'doctest', 'pdb', 'tarfile'],
+                    "compressed": True,
+                    "optimize": 2,
+                    "bundle_files": 3,
+                    "dist_dir": "exedist",
+                }
+            },
+            zipfile=None,
+        )
+    )
 
 
-#--------
+# --------
 # py2app
 # --------
 try:
@@ -63,9 +69,7 @@ try:
 except ImportError:
     pass
 else:
-    qt_plugins_path = subprocess.check_output(
-        "qmake -query QT_INSTALL_PLUGINS", shell=True
-    )
+    qt_plugins_path = subprocess.check_output("qmake -query QT_INSTALL_PLUGINS", shell=True)
     qt_plugins_path = qt_plugins_path[0 : len(qt_plugins_path) - 1]  # remove "\n"
     extra_options.update(
         dict(
@@ -123,8 +127,7 @@ setup(
     platforms="any",
     classifiers=[
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Development Status :: 5 - Production/Stable"
-        "Intended Audience :: End Users/Desktop",
+        "Development Status :: 5 - Production/StableIntended Audience :: End Users/Desktop",
         "Intended Audience :: Education",
         "Programming Language :: Python",
         "Operating System :: OS Independent",
@@ -145,5 +148,5 @@ setup(
     ],
     package_data={"ldoce5viewer": list(iter_static())},
     scripts=["scripts/ldoce5viewer"],
-    **extra_options
+    **extra_options,
 )

@@ -1,6 +1,5 @@
 """Tests for ldoce5viewer.incremental (Maker / Searcher)."""
 
-
 import pytest
 
 from ldoce5viewer.incremental import IndexError as IncrementalIndexError

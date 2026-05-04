@@ -2,17 +2,15 @@
 
 import os
 import os.path
-import shutil
-
 import pickle
+import shutil
 import traceback
 from html import escape
 from struct import Struct
 
+import lxml.etree as et
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-
-import lxml.etree as et
 
 from .. import __version__, fulltext, incremental
 from ..ldoce5 import filemap, idmreader
@@ -67,16 +65,12 @@ class IndexerDialog(QDialog):
 
         if "ProgramFiles" in os.environ:
             path.append(
-                os.path.join(
-                    os.environ["ProgramFiles"], "Longman", "LDOCE5", "ldoce5.data"
-                )
+                os.path.join(os.environ["ProgramFiles"], "Longman", "LDOCE5", "ldoce5.data")
             )
 
         if "ProgramFiles(x86)" in os.environ:
             path.append(
-                os.path.join(
-                    os.environ["ProgramFiles(x86)"], "Longman", "LDOCE5", "ldoce5.data"
-                )
+                os.path.join(os.environ["ProgramFiles(x86)"], "Longman", "LDOCE5", "ldoce5.data")
             )
         for p in path:
             if idmreader.is_ldoce5_dir(p):
@@ -84,9 +78,7 @@ class IndexerDialog(QDialog):
                 return
 
         self._message('Cannot find the "ldoce5.data" folder automatically.')
-        self._message(
-            'Click the "Browse..." button to ' 'select the "ldoce5.data" folder.'
-        )
+        self._message('Click the "Browse..." button to select the "ldoce5.data" folder.')
 
     def _onSourcePathChanged(self, text):
         is_valid_dir = idmreader.is_ldoce5_dir(text)
@@ -94,8 +86,7 @@ class IndexerDialog(QDialog):
         if is_valid_dir:
             self._ui.plainTextEdit.clear()
             self._message(
-                'The "ldoce5.data" folder is found.<br>'
-                'Click "Start Indexing" or "Cancel".'
+                'The "ldoce5.data" folder is found.<br>Click "Start Indexing" or "Cancel".'
             )
             if self._autostart:
                 self._start_indexing()
@@ -190,7 +181,7 @@ class IndexingThread(QThread):
             files = idmreader.list_files(self._srcdir, "fs")
             count = 0
             with idmreader.ArchiveReader(self._srcdir, "fs") as archive_reader:
-                for (dirs, name, location) in files:
+                for dirs, name, location in files:
                     if self._abort:
                         raise AbortIndexing()
 
@@ -213,7 +204,6 @@ class IndexingThread(QThread):
                         asfilter,
                         prio,
                     ) in items:
-
                         count += 1
                         if count % 10000 == 0:
                             self._message("{0} items found".format(count))
@@ -224,9 +214,7 @@ class IndexingThread(QThread):
                                 if "-" in w:
                                     content += " " + w.replace("-", "")
 
-                        scan_temp.append(
-                            (itemtype, label, path, content, sortkey, asfilter, prio)
-                        )
+                        scan_temp.append((itemtype, label, path, content, sortkey, asfilter, prio))
 
             self._message("{0} items were found.".format(count))
 
@@ -256,7 +244,7 @@ class IndexingThread(QThread):
             sections = {}
             files = idmreader.list_files(self._srcdir, "activator_section")
             with idmreader.ArchiveReader(self._srcdir, "activator_section") as cr:
-                for (dirs, name, location) in files:
+                for dirs, name, location in files:
                     if self._abort:
                         raise AbortIndexing()
 
@@ -273,7 +261,7 @@ class IndexingThread(QThread):
             files = idmreader.list_files(self._srcdir, "activator_concept")
             exponents = []
             with idmreader.ArchiveReader(self._srcdir, "activator_concept") as cr:
-                for (dirs, name, location) in files:
+                for dirs, name, location in files:
                     if self._abort:
                         raise AbortIndexing()
 
@@ -296,10 +284,10 @@ class IndexingThread(QThread):
 
                     for sno, section in enumerate(root.iterfind("Section")):
                         sid = section.get("id")
-                        for (eid, plain) in sections[sid]:
+                        for eid, plain in sections[sid]:
                             exponents.append((plain, hwd, cid, sid, eid, sno))
 
-            for (plain, hwd, cid, sid, eid, sno) in exponents:
+            for plain, hwd, cid, sid, eid, sno in exponents:
                 if self._abort:
                     raise AbortIndexing()
 
@@ -356,9 +344,7 @@ class IndexingThread(QThread):
             self._message("Done.")
 
         def make_full_hp(scan_temp):
-            self._message(
-                "Building the full text search index " "for headwords and phrases..."
-            )
+            self._message("Building the full text search index for headwords and phrases...")
             fulltext_hwdphr_maker = fulltext.Maker(get_config().fulltext_hwdphr_path)
 
             i = 0
@@ -391,9 +377,7 @@ class IndexingThread(QThread):
             self._message("Done.")
 
         def make_full_de(scan_temp):
-            self._message(
-                "Building the full text search index " "for examples and definitions..."
-            )
+            self._message("Building the full text search index for examples and definitions...")
             fulltext_defexa_maker = fulltext.Maker(get_config().fulltext_defexa_path)
 
             i = 0
@@ -441,7 +425,7 @@ class IndexingThread(QThread):
             for archive_name in idmreader.get_archive_names():
                 self._message("Analyzing '{0}'...".format(archive_name))
                 file_iter = filemap.list_files(self._srcdir, archive_name)
-                for (name, location) in file_iter:
+                for name, location in file_iter:
                     if self._abort:
                         raise AbortIndexing()
 
@@ -477,8 +461,7 @@ class IndexingThread(QThread):
             err = True
         except Exception:
             self._message(
-                "<div style='color: red'>"
-                "Error occurred<br>{0}</div>".format(
+                "<div style='color: red'>Error occurred<br>{0}</div>".format(
                     "<br>".join(traceback.format_exc().splitlines())
                 )
             )

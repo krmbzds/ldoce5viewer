@@ -1,8 +1,7 @@
-from typing import Tuple
-
 import os.path
 import traceback
 import zlib
+from typing import Tuple
 
 from ..utils.cdb import CDBError, CDBReader
 from . import transform
@@ -42,7 +41,7 @@ class LDOCE5(object):
         try:
             archive, name = path.lstrip("/").split("/", 1)
         except ValueError:
-            raise NotFoundError(u"invalid path")
+            raise NotFoundError("invalid path")
 
         def load_content(archive_name, name) -> bytes:
             # try:
@@ -57,7 +56,7 @@ class LDOCE5(object):
             except (IOError, CDBError):
                 raise FilemapError
             except KeyError:
-                raise NotFoundError(u"content not found in filemap")
+                raise NotFoundError("content not found in filemap")
             try:
                 with ArchiveReader(self._data_dir, archive_name) as reader:
                     return reader.read(location)
@@ -71,9 +70,7 @@ class LDOCE5(object):
                 exc = traceback.format_exc()
                 if isinstance(exc, bytes):
                     exc = traceback.format_exc().decode("utf-8", "replace")
-                s = u"<h2>Error</h2><div>{0}</div>".format(
-                    u"<br>".join(exc.splitlines())
-                )
+                s = "<h2>Error</h2><div>{0}</div>".format("<br>".join(exc.splitlines()))
                 return s.encode("utf-8")
 
         ret_data = None

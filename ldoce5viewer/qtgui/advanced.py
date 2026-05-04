@@ -3,7 +3,7 @@
 from operator import itemgetter
 
 from PySide6.QtCore import Qt, QUrl, QUrlQuery
-from PySide6.QtGui import QIcon, QKeySequence, QAction
+from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import QDialog, QTreeWidgetItem
 
 from ..ldoce5 import advtree
@@ -188,7 +188,7 @@ def _render_header(title, mode, phrase, filters):
     modes = [(name, spec) for (name, spec) in MODE_DICT.items()]
     modes.sort(key=itemgetter(0))
 
-    for (name, spec) in modes:
+    for name, spec in modes:
         q = QUrlQuery()
         if phrase:
             q.addQueryItem("phrase", phrase)
@@ -203,9 +203,7 @@ def _render_header(title, mode, phrase, filters):
                 )
             )
         else:
-            r.append(
-                '<li><span class="sel">{title}<span></li>\n'.format(title=spec["title"])
-            )
+            r.append('<li><span class="sel">{title}<span></li>\n'.format(title=spec["title"]))
 
     r.append("</ul>\n")
     return "".join(r)
@@ -236,7 +234,6 @@ def _render_defexa(items, mode):
                 ' <span class="text">{text}</span>'
                 "</a>"
                 "</li>\n".format(
-                    item=item,
                     label=_replace_tags(label),
                     path=path,
                     text=text,

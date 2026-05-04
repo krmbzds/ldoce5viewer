@@ -125,9 +125,7 @@ class AsyncFTSearcher(QObject):
         highlight=False,
         merge=False,
     ):
-        self._thread.update_query(
-            query_str1, query_str2, itemtypes, limit, highlight, merge
-        )
+        self._thread.update_query(query_str1, query_str2, itemtypes, limit, highlight, merge)
 
     def shutdown(self):
         self._thread.quit()

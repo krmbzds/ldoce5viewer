@@ -39,32 +39,26 @@ def _get_text_nr(e):
 
 
 def _build_header(resnames, title=None, meta={}):
-    r = ['<!DOCTYPE html>\n<html lang="en">\n<head>\n' '<meta charset="utf-8">\n']
+    r = ['<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n']
 
     for k in meta:
         v = meta[k]
         r.append('<meta name="{0}" content="{1}" />'.format(escape(k), escape(v)))
 
-    r.append(
-        '<script type="application/javascript" '
-        'src="static:///scripts/jquery.js"></script>\n'
-    )
+    r.append('<script type="application/javascript" src="static:///scripts/jquery.js"></script>\n')
     r.append(
         '<script type="application/javascript" '
         'src="static:///scripts/colorbox/jquery.colorbox.js"></script>\n'
     )
     r.append(
-        '<link href="static:///scripts/colorbox/colorbox.css" '
-        'rel="stylesheet" type="text/css">\n'
+        '<link href="static:///scripts/colorbox/colorbox.css" rel="stylesheet" type="text/css">\n'
     )
     for name in resnames:
         r.append(
-            '<link href="static:///styles/{0}.css" '
-            'rel="stylesheet" type="text/css">\n'.format(name)
+            '<link href="static:///styles/{0}.css" rel="stylesheet" type="text/css">\n'.format(name)
         )
         r.append(
-            '<link href="static:///styles/{0}.css" '
-            'rel="stylesheet" type="text/css">\n'.format(name)
+            '<link href="static:///styles/{0}.css" rel="stylesheet" type="text/css">\n'.format(name)
         )
         r.append(
             '<script type="application/javascript" '
@@ -234,20 +228,14 @@ def trans_word_families(data):
             ref = w.find("Ref")
             if ref is not None:
                 link = "/fs/" + shorten_id(ref.get("topic"))
-                r.append(
-                    '<a href="{0}" class=hwd>{1}</a>'.format(link, escape(ref.text))
-                )
+                r.append('<a href="{0}" class=hwd>{1}</a>'.format(link, escape(ref.text)))
             else:
                 r.append(_get_text_r(w))
 
             ref = w.find("opp/Ref")
             if ref is not None:
                 link = "/fs/" + shorten_id(ref.get("topic"))
-                r.append(
-                    ' &#x2260; <a href="{0}" class=hwd>{1}</a>'.format(
-                        link, escape(ref.text)
-                    )
-                )
+                r.append(' &#x2260; <a href="{0}" class=hwd>{1}</a>'.format(link, escape(ref.text)))
 
             r.append("</li>\n")
         r.append("</ul>\n")

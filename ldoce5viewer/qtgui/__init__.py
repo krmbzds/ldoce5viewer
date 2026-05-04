@@ -46,9 +46,7 @@ def run(argv):
     config = get_config()
 
     # py2exe
-    if sys.platform == "win32" and (
-        hasattr(sys, "frozen") or hasattr(sys, "importers")
-    ):
+    if sys.platform == "win32" and (hasattr(sys, "frozen") or hasattr(sys, "importers")):
         _setup_py2exe(config)
 
     # Parse arguments

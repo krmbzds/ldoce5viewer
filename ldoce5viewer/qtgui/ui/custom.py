@@ -48,9 +48,7 @@ class LineEdit(QLineEdit):
         self._buttonFind.setCursor(Qt.CursorShape.ArrowCursor)
         self._buttonFind.setIconSize(QSize(ICONSIZE, ICONSIZE))
         self._buttonFind.setIcon(QIcon(":/icons/edit-find.png"))
-        self._buttonFind.setStyleSheet(
-            "QToolButton { border: none; margin: 0; padding: 0; }"
-        )
+        self._buttonFind.setStyleSheet("QToolButton { border: none; margin: 0; padding: 0; }")
         self._buttonFind.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._buttonFind.clicked.connect(self.selectAll)
 
@@ -60,9 +58,7 @@ class LineEdit(QLineEdit):
         self._buttonClear.setCursor(Qt.CursorShape.ArrowCursor)
         self._buttonClear.setIconSize(QSize(ICONSIZE, ICONSIZE))
         self._buttonClear.setIcon(QIcon(":/icons/edit-clear.png"))
-        self._buttonClear.setStyleSheet(
-            "QToolButton { border: none; margin: 0; padding: 0; }"
-        )
+        self._buttonClear.setStyleSheet("QToolButton { border: none; margin: 0; padding: 0; }")
         self._buttonClear.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._buttonClear.clicked.connect(self.clear)
 
@@ -105,7 +101,10 @@ class LineEditFind(QLineEdit):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
             self.escapePressed.emit()
-        elif event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ShiftModifier:
+        elif (
+            event.key() == Qt.Key.Key_Return
+            and event.modifiers() == Qt.KeyboardModifier.ShiftModifier
+        ):
             self.shiftReturnPressed.emit()
         elif event.key() == Qt.Key.Key_Return:
             self.returnPressed.emit()
@@ -115,7 +114,6 @@ class LineEditFind(QLineEdit):
 
 class HtmlListWidget(QListWidget):
     class HtmlItemDelegate(QStyledItemDelegate):
-
         MARGIN_H = 5
         if sys.platform.startswith("win"):
             MARGIN_V = 3
@@ -192,8 +190,8 @@ class WebView(QWebEngineView):
         self._actionCopyPlain.setShortcut(QKeySequence.StandardKey.Copy)
         self.page().selectionChanged.connect(self.__onSelectionChanged)
         self.__onSelectionChanged()
-        self._actionDownloadAudio = QAction(u'Download mp3',  self)
-        self._actionCopyToAnki = QAction(u'Anki',  self)
+        self._actionDownloadAudio = QAction("Download mp3", self)
+        self._actionCopyToAnki = QAction("Anki", self)
 
     def _copyAsPlainText(self):
         text = self.selectedText().strip()
@@ -235,7 +233,7 @@ class WebView(QWebEngineView):
         # inserts the "Copy to Anki" action
         frame = page.frameAt(event.pos())
         hit_test_result = frame.hitTestContent(event.pos())
-        
+
         header = frame.findFirstElement(".head").toOuterXml()
         header = header.replace("\n", "")
 
@@ -243,8 +241,7 @@ class WebView(QWebEngineView):
         meaning = meaning.replace("\n", "")
 
         self._copyToAnki = (header, meaning)
-        menu.insertAction(actions[0] if actions else None,
-                    self.actionCopyToAnki)
+        menu.insertAction(actions[0] if actions else None, self.actionCopyToAnki)
 
         # inserts the "Download audio" action
         # FIXME
@@ -258,7 +255,7 @@ class WebView(QWebEngineView):
         text = page.selectedText().strip().lower()
         if text:
             text = ellipsis(text, 18)
-            self._actionSearchText.setText(u'Lookup "{0}"'.format(text))
+            self._actionSearchText.setText('Lookup "{0}"'.format(text))
             menu.insertAction(actions[0] if actions else None, self.actionSearchText)
 
         # Replace WebKit's copy action with plain-text copying

@@ -61,7 +61,7 @@ def list_files(data_dir, arch_name):
     with idmreader.ArchiveReader(data_dir, arch_name) as arch_reader:
         files = idmreader.list_files(data_dir, arch_name)
 
-        for (dirs, name, location) in files:
+        for dirs, name, location in files:
             if arch_name == "picture":
                 name = "{0}/{1}".format(dirs[0], name)
             elif arch_name == "fs" or arch_name == "pronpractice":

@@ -1,13 +1,12 @@
 """This module prevent you from running two instances of the app"""
 
-
 from PySide6.QtCore import QIODevice, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 
 class SingleApplication(QApplication):
-    messageAvailable = Signal(type(u""))
+    messageAvailable = Signal(type(""))
 
     def __init__(self, argv, key):
         QApplication.__init__(self, argv)

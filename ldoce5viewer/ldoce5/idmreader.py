@@ -71,7 +71,7 @@ def list_files(data_root, archive_name):
         r = {}
         r["offsets"] = {}
         offset = 0
-        for (opt, value) in cp.items("DAT"):
+        for opt, value in cp.items("DAT"):
             if value in _IDM_TYPE_SIZES:
                 name = opt.split(",")[0].strip()
                 size = _IDM_TYPE_SIZES[value]
@@ -136,9 +136,7 @@ def list_files(data_root, archive_name):
                 parentlist.append(_bytes2int(record[f_parent]))
 
         # size
-        sizelist = [
-            offsetlist[i + 1] - offsetlist[i] - 1 for i in range(len(offsetlist) - 1)
-        ]
+        sizelist = [offsetlist[i + 1] - offsetlist[i] - 1 for i in range(len(offsetlist) - 1)]
         sizelist.append(-1)
         return list(zip(namelist, parentlist, offsetlist, sizelist))
 
@@ -186,7 +184,7 @@ def list_files(data_root, archive_name):
     (origoffsets, origsizes, cmpoffsets, cmpsizes) = _load_catalog(target_base)
     dirs = _load_dirlist(target_base, info)
     ci = 0
-    for (name, parent, offset, size) in _load_filelist(target_base, info):
+    for name, parent, offset, size in _load_filelist(target_base, info):
         if ci != len(origoffsets) - 1:
             if offset >= origoffsets[ci + 1]:
                 ci += 1

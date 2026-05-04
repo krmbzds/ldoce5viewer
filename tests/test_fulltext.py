@@ -1,6 +1,5 @@
 """Tests for ldoce5viewer.fulltext (Maker / Searcher / VariationsReader)."""
 
-
 import pytest
 
 try:

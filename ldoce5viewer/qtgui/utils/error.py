@@ -2,7 +2,7 @@
 
 from logging import StreamHandler
 
-from PySide6.QtCore import QRecursiveMutex, QObject, Signal
+from PySide6.QtCore import QObject, QRecursiveMutex, Signal
 from PySide6.QtWidgets import QPlainTextEdit
 
 
@@ -22,7 +22,7 @@ class MyStreamHandler(StreamHandler):
 
 
 class StdErrWrapper(QObject):
-    _write = Signal(type(u""))
+    _write = Signal(type(""))
     _flush = Signal()
 
     def __init__(self, old_stderr):
@@ -35,14 +35,14 @@ class StdErrWrapper(QObject):
         assert self._widget is None
 
         widget = QPlainTextEdit()
-        widget.setWindowTitle(u"Error Console")
+        widget.setWindowTitle("Error Console")
         widget.resize(486, 300)
         widget.appendHtml(
-            u'<span style="color: green">'
-            u"An unhandled error occurred.<br>"
-            u"Sorry for the inconvinience.<br>"
-            u"Please copy the following text into a bug report:<br><br>"
-            u"</span>"
+            '<span style="color: green">'
+            "An unhandled error occurred.<br>"
+            "Sorry for the inconvinience.<br>"
+            "Please copy the following text into a bug report:<br><br>"
+            "</span>"
         )
         app.aboutToQuit.connect(self.restoreStdErr)
         self._write.connect(self._write_handler)

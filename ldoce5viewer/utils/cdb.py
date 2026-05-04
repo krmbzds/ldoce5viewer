@@ -67,7 +67,7 @@ class CDBReader(object):
                 yield _read_2L(mm[p : p + 8])
 
         if num_entries:
-            for (h, p) in iter_subtable():
+            for h, p in iter_subtable():
                 if p == 0:
                     # not exist
                     break

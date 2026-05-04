@@ -127,9 +127,7 @@ class MyVariations(Variations):
             return words
 
     def __deepcopy__(self, x):
-        return MyVariations(
-            self.__var_reader, self.__fieldname, self.__text, self.__boost
-        )
+        return MyVariations(self.__var_reader, self.__fieldname, self.__text, self.__boost)
 
 
 # -----------------
@@ -216,18 +214,14 @@ class Searcher(object):
             AndMaybe=None,
             Require=None,
         )
-        parser = QueryParser(
-            "content", _schema, termclass=my_variations(self._var_reader)
-        )
+        parser = QueryParser("content", _schema, termclass=my_variations(self._var_reader))
         parser.remove_plugin_class(RangePlugin)
         parser.remove_plugin_class(BoostPlugin)
         parser.remove_plugin_class(WildcardPlugin)
         parser.replace_plugin(op)
         self._parser = parser
 
-        parser_wild = QueryParser(
-            "content", _schema, termclass=my_variations(self._var_reader)
-        )
+        parser_wild = QueryParser("content", _schema, termclass=my_variations(self._var_reader))
         parser_wild.remove_plugin_class(RangePlugin)
         parser_wild.remove_plugin_class(BoostPlugin)
         parser_wild.replace_plugin(op)
@@ -270,9 +264,7 @@ class Searcher(object):
         else:
             return AbortableCollector(TopCollector(limit))
 
-    def search(
-        self, collector, query_str1=None, query_str2=None, itemtypes=(), highlight=False
-    ):
+    def search(self, collector, query_str1=None, query_str2=None, itemtypes=(), highlight=False):
 
         # rejects '*' and '?'
         if query_str1:

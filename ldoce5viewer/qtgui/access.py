@@ -42,9 +42,7 @@ def _load_static_data(filename):
                 filename,
             )
         else:
-            path = os.path.join(
-                os.path.dirname(sys.executable), STATIC_REL_PATH, filename
-            )
+            path = os.path.join(os.path.dirname(sys.executable), STATIC_REL_PATH, filename)
         with open(path, "rb") as f:
             data = f.read()
     else:
@@ -119,7 +117,7 @@ class MyUrlSchemeHandler(QWebEngineUrlSchemeHandler):
                     data = enc_utf8(search_and_render(url, searcher_hp, searcher_de))
                     mime = "text/html"
                 except Exception:
-                    s = u"<h2>Error</h2><div>{0}</div>".format(
+                    s = "<h2>Error</h2><div>{0}</div>".format(
                         "<br>".join(traceback.format_exc().splitlines())
                     )
                     data = enc_utf8(s)

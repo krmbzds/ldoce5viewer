@@ -1,22 +1,20 @@
 """Main window"""
 
-import sys
-import re
 import os
-from operator import itemgetter
-from functools import partial
+import re
+import sys
 from difflib import SequenceMatcher
+from functools import partial
+from operator import itemgetter
+
 try:
     from itertools import imap as map
 except ImportError:
     pass
 import webbrowser
-from difflib import SequenceMatcher
-from functools import partial
-from operator import itemgetter
 
-from PySide6.QtPrintSupport import QPrintPreviewDialog, QPrintDialog, QPrinter
-from PySide6.QtWebEngineCore import QWebEngineUrlScheme, QWebEngineFindTextResult
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
+from PySide6.QtWebEngineCore import QWebEngineFindTextResult, QWebEngineUrlScheme
 from PySide6.QtWidgets import *
 
 try:
@@ -66,8 +64,8 @@ def _incr_delay_func(count):
     x = max(0.3, min(1, float(count) / _INCREMENTAL_LIMIT))
     return int(_MAX_DELAY_UPDATE_INDEX * x)
 
-class MainWindow(QMainWindow):
 
+class MainWindow(QMainWindow):
     # ------------
     # MainWindow
     # ------------
@@ -270,9 +268,7 @@ class MainWindow(QMainWindow):
             title = None
         if title:
             self.setWindowTitle(
-                "{title} - {appname}".format(
-                    title=title, appname=QApplication.applicationName()
-                )
+                "{title} - {appname}".format(title=title, appname=QApplication.applicationName())
             )
         else:
             self.setWindowTitle(QApplication.applicationName())
@@ -337,9 +333,7 @@ class MainWindow(QMainWindow):
         del full_res
 
         # Create a new list
-        items = tuple(
-            _replace_htmltags(text_getter(item)) for item in self._found_items
-        )
+        items = tuple(_replace_htmltags(text_getter(item)) for item in self._found_items)
         lw.clear()
         lw.addItems(items)
 
@@ -354,7 +348,7 @@ class MainWindow(QMainWindow):
 
         url = self._ui.webView.url().toString()
         sel_row = -1
-        for (row, path) in enumerate(map(path_getter, self._found_items)):
+        for row, path in enumerate(map(path_getter, self._found_items)):
             if "dict:" + path == url:
                 sel_row = row
                 break
@@ -390,7 +384,7 @@ class MainWindow(QMainWindow):
             # Find the prefix/exact match
             text = normalize_index_key(ui.lineEditSearch.text()).lower()
             sortkey_iter = map(sortkey_getter, self._found_items)
-            for (row, sortkey) in enumerate(sortkey_iter):
+            for row, sortkey in enumerate(sortkey_iter):
                 if sortkey.lower().startswith(text):
                     lw.setFocus()
                     lw.setCurrentRow(row)
@@ -401,7 +395,7 @@ class MainWindow(QMainWindow):
             sm = SequenceMatcher(a=text)
             max_ratio = 0
             sortkeys = map(sortkey_getter, self._found_items)
-            for (r, sortkey) in enumerate(sortkeys):
+            for r, sortkey in enumerate(sortkeys):
                 sm.set_seq2(sortkey)
                 ratio = sm.quick_ratio()
                 if ratio > max_ratio:
@@ -467,9 +461,7 @@ class MainWindow(QMainWindow):
                 self._incr_results = tuple(results)
                 self._auto_fts_phrase = query
                 self._timerAutoFTS.start(0)
-                self._timerUpdateIndex.start(
-                    _incr_delay_func(len(results)) if delay else 0
-                )
+                self._timerUpdateIndex.start(_incr_delay_func(len(results)) if delay else 0)
             else:
                 self._ui.webView.setHtml(
                     """<p>The incremental search index"""
@@ -558,54 +550,65 @@ class MainWindow(QMainWindow):
 
     # ----------
     # WebView
-    #----------
+    # ----------
 
     def _playbackAudio(self, path):
         self._getAudioData(path, lambda data, path: self._soundplayer.play(data))
 
-    def _getAudioData(self,  path,  callback):
-        (archive, name) = path.lstrip('/').split('/', 1)
-        if archive in ('us_hwd_pron', 'gb_hwd_pron', 'exa_pron', 'sfx', 'sound'):
+    def _getAudioData(self, path, callback):
+        (archive, name) = path.lstrip("/").split("/", 1)
+        if archive in ("us_hwd_pron", "gb_hwd_pron", "exa_pron", "sfx", "sound"):
+
             def finished():
                 if reply.error() == QNetworkReply.NoError:
                     callback(reply.readAll(), name)
 
-            url = QUrl('dict:///{0}/{1}'.format(archive, name))
+            url = QUrl("dict:///{0}/{1}".format(archive, name))
             reply = self._networkAccessManager.get(QNetworkRequest(url))
             reply.finished.connect(finished)
 
     def downloadSelectedAudio(self):
         path = self._ui.webView.audioUrlToDownload.path()
+
         def showSaveDialog(data, name):
-            filename = QFileDialog.getSaveFileName(self,  u'Save mp3',  name,  u'MP3 Files (*.mp3)')
-            if filename != '':
+            filename = QFileDialog.getSaveFileName(self, "Save mp3", name, "MP3 Files (*.mp3)")
+            if filename != "":
                 file = open(filename, "wb")
                 file.write(data)
                 file.close()
+
         self._getAudioData(path, showSaveDialog)
 
     def copyToAnki(self):
         audio_urls = []
 
-        anki_dir = 'anki'
+        anki_dir = "anki"
         if not os.path.exists(anki_dir):
             os.mkdir(anki_dir)
 
-        anki_media_dir = os.path.join(anki_dir, 'collection.media')
+        anki_media_dir = os.path.join(anki_dir, "collection.media")
         if not os.path.exists(anki_media_dir):
-            os.mkdir(anki_media_dir)            
+            os.mkdir(anki_media_dir)
 
         with open(os.path.join(anki_dir, "anki.txt"), "a") as f:
             header, meaning = self._ui.webView.copyToAnki
 
             audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', header))
             audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', meaning))
-            
-            header = re.sub(r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/"]*?\.mp3)" title="([^"]+)"><img src="[^"]+"></a>', r'<a class="audio" title="\2">[sound:\1]</a>', header)
-            meaning = re.sub(r'<a class="audio" href="audio:///exa_pron/([^/"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>', r'<a class="audio" title="Play">[sound:\1]</a>', meaning)
+
+            header = re.sub(
+                r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/"]*?\.mp3)" title="([^"]+)"><img src="[^"]+"></a>',
+                r'<a class="audio" title="\2">[sound:\1]</a>',
+                header,
+            )
+            meaning = re.sub(
+                r'<a class="audio" href="audio:///exa_pron/([^/"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>',
+                r'<a class="audio" title="Play">[sound:\1]</a>',
+                meaning,
+            )
 
             line = header + "\t" + meaning + "\n"
-            f.write(line.encode('UTF-8'))
+            f.write(line.encode("UTF-8"))
 
         def saveAudioFile(data, filename):
             file = open(os.path.join(anki_media_dir, filename), "wb")
@@ -617,12 +620,12 @@ class MainWindow(QMainWindow):
 
     def _onWebViewLinkClicked(self, url):
         scheme = url.scheme()
-        if scheme == 'audio':
+        if scheme == "audio":
             self._playbackAudio(url.path())
-        elif scheme == 'lookup':
+        elif scheme == "lookup":
             query = dict((k, v) for (k, v) in url.queryItems())
-            if 'q' in query:
-                q = query['q'].replace('+', ' ')
+            if "q" in query:
+                q = query["q"].replace("+", " ")
                 self._ui.lineEditSearch.setText(q)
                 self._instantSearch(pending=True, delay=False)
         elif scheme in _LOCAL_SCHEMES:
@@ -651,9 +654,7 @@ class MainWindow(QMainWindow):
 
     def _onUrlChanged(self, url):
         history = self._ui.webView.history()
-        if history.currentItemIndex() == 1 and history.itemAt(0).url() == QUrl(
-            "about:blank"
-        ):
+        if history.currentItemIndex() == 1 and history.itemAt(0).url() == QUrl("about:blank"):
             history.clear()
 
         # Update history menu
@@ -880,20 +881,19 @@ class MainWindow(QMainWindow):
         elif result.numberOfMatches() == 0:
             self._ui.labelFindResults.setText("")
         else:
-            self._ui.labelFindResults.setText(f"{result.activeMatch()} of {result.numberOfMatches()} matches")
+            self._ui.labelFindResults.setText(
+                f"{result.activeMatch()} of {result.numberOfMatches()} matches"
+            )
 
     def findText(self, text):
         self._ui.webView.page().findText(text)
 
     def findNext(self):
-        self._ui.webView.findText(
-            self._ui.lineEditFind.text()
-        )
+        self._ui.webView.findText(self._ui.lineEditFind.text())
 
     def findPrev(self):
         self._ui.webView.findText(
-            self._ui.lineEditFind.text(),
-            QWebEnginePage.FindFlag.FindBackward
+            self._ui.lineEditFind.text(), QWebEnginePage.FindFlag.FindBackward
         )
 
     # -------
@@ -952,9 +952,7 @@ class MainWindow(QMainWindow):
                 # dataDir has been dissapeared
                 msg = (
                     "The 'ldoce5.data' folder is not found at '{0}'.\n"
-                    "Please recreate the index database.".format(
-                        config.get("dataDir", "")
-                    )
+                    "Please recreate the index database.".format(config.get("dataDir", ""))
                 )
             else:
                 return
@@ -1025,7 +1023,9 @@ class MainWindow(QMainWindow):
         ui.lineEditSearch = LineEdit(self)
         ui.lineEditSearch.setPlaceholderText("Search...")
         ui.lineEditSearch.setInputMethodHints(
-            Qt.InputMethodHint.ImhUppercaseOnly | Qt.InputMethodHint.ImhLowercaseOnly | Qt.InputMethodHint.ImhDigitsOnly
+            Qt.InputMethodHint.ImhUppercaseOnly
+            | Qt.InputMethodHint.ImhLowercaseOnly
+            | Qt.InputMethodHint.ImhDigitsOnly
         )
         toolBar.addWidget(ui.toolButtonNavBack)
         toolBar.addWidget(ui.toolButtonNavForward)
@@ -1037,22 +1037,20 @@ class MainWindow(QMainWindow):
         # Icons
         def _set_icon(obj, name=None, var_suffix=""):
             if name:
-                icon = QIcon.fromTheme(
-                    name, QIcon(":/icons/" + name + var_suffix + ".png")
-                )
+                icon = QIcon.fromTheme(name, QIcon(":/icons/" + name + var_suffix + ".png"))
                 obj.setIcon(icon)
             else:
                 obj.setIcon(QIcon())
 
         self.setWindowIcon(QIcon(":/icons/icon.png"))
 
-        _set_icon(ui.actionFindClose, 'window-close')
-        _set_icon(ui.actionNavForward, 'go-next', '24')
-        _set_icon(ui.actionNavBack, 'go-previous', '24')
-        _set_icon(ui.actionFindNext, 'go-down')
-        _set_icon(ui.actionFindPrev, 'go-up')
-        _set_icon(ui.actionCloseInspector, 'window-close')
-        _set_icon(wv.actionCopyToAnki, 'anki')
+        _set_icon(ui.actionFindClose, "window-close")
+        _set_icon(ui.actionNavForward, "go-next", "24")
+        _set_icon(ui.actionNavBack, "go-previous", "24")
+        _set_icon(ui.actionFindNext, "go-down")
+        _set_icon(ui.actionFindPrev, "go-up")
+        _set_icon(ui.actionCloseInspector, "window-close")
+        _set_icon(wv.actionCopyToAnki, "anki")
 
         ui.actionSearchDefinitions.setIcon(QIcon())
         ui.actionSearchExamples.setIcon(QIcon())
@@ -1175,9 +1173,7 @@ class MainWindow(QMainWindow):
         ui.lineEditSearch.textEdited.connect(self._onTextEdited)
         ui.lineEditFind.textChanged.connect(self.findText)
         ui.lineEditFind.returnPressed.connect(self.findNext)
-        ui.lineEditFind.escapePressed.connect(
-            partial(self.setFindbarVisible, visible=False)
-        )
+        ui.lineEditFind.escapePressed.connect(partial(self.setFindbarVisible, visible=False))
         ui.lineEditFind.shiftReturnPressed.connect(self.findPrev)
         ui.listWidgetIndex.itemSelectionChanged.connect(self._onItemSelectionChanged)
         # FIXME(wontfix): webpage.linkClicked.connect(self._onWebViewLinkClicked)
@@ -1212,9 +1208,7 @@ class MainWindow(QMainWindow):
         act_conn(ui.actionMonitorClipboard, self._onMonitorClipboardChanged)
         act_conn(ui.actionFind, partial(self.setFindbarVisible, visible=True))
         act_conn(ui.actionFindClose, partial(self.setFindbarVisible, visible=False))
-        act_conn(
-            ui.actionCloseInspector, partial(self.setInspectorVisible, visible=False)
-        )
+        act_conn(ui.actionCloseInspector, partial(self.setInspectorVisible, visible=False))
         act_conn(
             webpage.action(QWebEnginePage.WebAction.InspectElement),
             partial(self.setInspectorVisible, visible=True),
@@ -1397,9 +1391,7 @@ class MainWindow(QMainWindow):
         if obj is None:
             searcher = self._fts_hwdphr
             if searcher:
-                obj = self._lazy[_LAZY_FTS_HWDPHR_ASYNC] = AsyncFTSearcher(
-                    self, searcher
-                )
+                obj = self._lazy[_LAZY_FTS_HWDPHR_ASYNC] = AsyncFTSearcher(self, searcher)
                 obj.finished.connect(self._onAsyncFTSearchFinished)
                 obj.error.connect(self._onAsyncFTSearchError)
 

@@ -2,10 +2,10 @@
 
 import os
 import os.path
+import pickle
 import shutil
 import sys
 import tempfile
-import pickle
 
 from PySide6.QtCore import QReadWriteLock
 

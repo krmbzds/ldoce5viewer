@@ -147,9 +147,7 @@ class Maker(object):
         path_e = path.encode("ascii")
         data = b"".join(
             (
-                _pack_HBHHB(
-                    len(plain_e), len(typecode_e), len(label_e), len(path_e), prio
-                ),
+                _pack_HBHHB(len(plain_e), len(typecode_e), len(label_e), len(path_e), prio),
                 plain_e,
                 typecode_e,
                 label_e,

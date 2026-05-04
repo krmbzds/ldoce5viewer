@@ -7,7 +7,6 @@ This module generates HTML documents from LDOCE's XML entry documents.
 
 import platform
 import re
-
 from urllib.parse import urlencode
 
 from lxml.etree import Element, tounicode
@@ -203,14 +202,10 @@ def _trans_assets(root):
     assets = {}
     for asset in root.iterfind(".//EntryAsset"):
         asset_type = asset.get("type").lower()
-        assets[asset_type] = "_".join(
-            ref.get("topic") for ref in asset.iterfind("Refs/Ref")
-        )
+        assets[asset_type] = "_".join(ref.get("topic") for ref in asset.iterfind("Refs/Ref"))
 
     if "entry_collocations" in assets:
-        colloc.append(
-            ("This Entry", "dict:///collocations/" + assets["entry_collocations"])
-        )
+        colloc.append(("This Entry", "dict:///collocations/" + assets["entry_collocations"]))
     if "other_entries_collocations" in assets:
         colloc.append(
             (
@@ -219,9 +214,7 @@ def _trans_assets(root):
             )
         )
     if "corpus_collocations" in assets:
-        colloc.append(
-            ("Corpus", "dict:///collocations/" + assets["corpus_collocations"])
-        )
+        colloc.append(("Corpus", "dict:///collocations/" + assets["corpus_collocations"]))
     if "thesaurus" in assets:
         thesaurus.append(("Thesaurus", "dict:///thesaurus/" + assets["thesaurus"]))
     if "activator" in assets:
@@ -229,17 +222,13 @@ def _trans_assets(root):
     if "word_sets" in assets:
         thesaurus.append(("Word Set", "dict:///word_sets/" + assets["word_sets"]))
     if "other_dictionary_examples" in assets:
-        example.append(
-            ("Other Dicts", "dict:///examples/" + assets["other_dictionary_examples"])
-        )
+        example.append(("Other Dicts", "dict:///examples/" + assets["other_dictionary_examples"]))
     if "corpus_examples" in assets:
         example.append(("Corpus", "dict:///examples/" + assets["corpus_examples"]))
     if "entry_phrases" in assets:
         phrase.append(("This Entry", "dict:///phrases/" + assets["entry_phrases"]))
     if "other_entries_phrases" in assets:
-        phrase.append(
-            ("Other Entries", "dict:///phrases/" + assets["other_entries_phrases"])
-        )
+        phrase.append(("Other Entries", "dict:///phrases/" + assets["other_entries_phrases"]))
     if "word_families" in assets:
         word.append(("Family", "dict:///word_families/" + assets["word_families"]))
     if "etymology" in assets:
@@ -274,7 +263,7 @@ def _trans_assets(root):
     def make_box(title, classname, items):
         head = _E("div", {"class": "assethead"}, [title])
         c = []
-        for (name, link) in items:
+        for name, link in items:
             c.append(_E("li", {}, (_E("a", dict(href=link), name),)))
 
         body = _E("ul", {"class": "assetbody"}, c)
@@ -420,8 +409,6 @@ def body2html(root):
     body = "".join(r).translate({0x2027: 0xB7})
     body = re.sub(r"([→►↔])", r"<span>\1</span>", body)
     if platform.release() == "XP" and platform.system() == "Windows":
-        body = re.sub(
-            r"([\u02cc\u02c8\u2194])", r'<span class="winxpsym">\1</span>', body
-        )
+        body = re.sub(r"([\u02cc\u02c8\u2194])", r'<span class="winxpsym">\1</span>', body)
 
     return body

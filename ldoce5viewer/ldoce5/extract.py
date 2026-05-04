@@ -10,7 +10,7 @@ import lxml.etree as et
 
 from .utils import shorten_id
 
-_MATCH_SPACE = re.compile("\s+")
+_MATCH_SPACE = re.compile(r"\s+")
 _EXCLUDE_TAGS = frozenset(("span", "OBJECT", "GLOSS"))
 _SEARCH_COUNTABLE = re.compile(r"(\bcountable\b|\bc\b|\b(often|usually)\s+plural\b)")
 _SEARCH_UNCOUNTABLE = re.compile(r"(\buncountable\b)")
@@ -88,9 +88,7 @@ def _make_variations(base, inflections):
     return ret
 
 
-def _get_incorrect_inflections(
-    base, pos_elems, gram_main_elems, gram_sub_elems, num_syllable
-):
+def _get_incorrect_inflections(base, pos_elems, gram_main_elems, gram_sub_elems, num_syllable):
 
     poslist = frozenset(_get_text(e).lower() for e in pos_elems)
     gramlist_main = frozenset(_get_text(e).lower() for e in gram_main_elems)
@@ -134,9 +132,7 @@ def _get_incorrect_inflections(
 
         if num_syllable >= 3:
             return make_comparative()
-        elif num_syllable >= 2 and not (
-            endswith("y") or endswith("le") or endswith("er")
-        ):
+        elif num_syllable >= 2 and not (endswith("y") or endswith("le") or endswith("er")):
             return make_comparative()
 
         return ()
@@ -231,9 +227,7 @@ def get_entry_items(entry_data):
 
         poslist = head.findall("POS")
         if poslist:
-            hwdlabel += " <p>{0}</p>".format(
-                escape(", ".join(_get_text(pos) for pos in poslist))
-            )
+            hwdlabel += " <p>{0}</p>".format(escape(", ".join(_get_text(pos) for pos in poslist)))
 
         return hwdlabel
 
@@ -270,9 +264,7 @@ def get_entry_items(entry_data):
                 continue
             if inflxplain in incorrect:
                 continue
-            inflxlabel = "<h><v>{0}</v> &rarr; {1}</h>".format(
-                escape(inflxplain), hwdlabel
-            )
+            inflxlabel = "<h><v>{0}</v> &rarr; {1}</h>".format(escape(inflxplain), hwdlabel)
             yield ("hv", inflxlabel, path, inflxplain, inflxplain, asfilter, 2)
 
         variants = chain(head.iterfind(".//LEXVAR"), head.iterfind(".//ORTHVAR"))
@@ -287,9 +279,7 @@ def get_entry_items(entry_data):
             for v_plain in v_plains:
                 if v_plain in incorrect:
                     continue
-                v_label = "<h><v>{0}</v> &rarr; {1}</h>".format(
-                    escape(v_plain), hwdlabel
-                )
+                v_label = "<h><v>{0}</v> &rarr; {1}</h>".format(escape(v_plain), hwdlabel)
                 yield ("hv", v_label, v_path, v_plain, v_plain, v_asfilter, 2)
 
         for abbr in head.iterfind(".//ABBR"):
@@ -316,9 +306,7 @@ def get_entry_items(entry_data):
         plain = plain.replace("\u02c8", "")
         plain = plain.replace("\u02cc", "")
         if poslist is not None:
-            label = "<n>{0}</n> <p>{1}</p>".format(
-                escape(plain), escape(", ".join(poslist))
-            )
+            label = "<n>{0}</n> <p>{1}</p>".format(escape(plain), escape(", ".join(poslist)))
         else:
             label = "<n>{0}</n>".format(escape(plain))
         yield ("hm", "<h>" + label + "</h>", path, plain, plain, asfilter, 1)
@@ -433,12 +421,7 @@ def get_entry_items(entry_data):
         variants = chain(elem.iterfind(".//LEXVAR"), elem.iterfind(".//ORTHVAR"))
         for var in variants:
             path = "/fs/{0}#{1}".format(root_id, shorten_id(var.get("id")))
-            v_plain = (
-                _get_text(var)
-                .replace("\xb7", "")
-                .replace("\u02c8", "")
-                .replace("\u02cc", "")
-            )
+            v_plain = _get_text(var).replace("\xb7", "").replace("\u02c8", "").replace("\u02cc", "")
             v_label = "<l><o>{0}</o> ({1})</l>".format(escape(v_plain), hwdlabel)
             yield ("pl", v_label, path, v_plain, v_plain, "", 11)
 
