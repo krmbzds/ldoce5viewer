@@ -66,7 +66,7 @@ class LDOCE5(object):
         def transform_exc(tf, *data):
             try:
                 return tf(*data)
-            except:
+            except Exception:
                 exc = traceback.format_exc()
                 if isinstance(exc, bytes):
                     exc = traceback.format_exc().decode("utf-8", "replace")

@@ -61,7 +61,7 @@ class Searcher(object):
     def __del__(self):
         try:
             self.close()
-        except:
+        except Exception:
             pass
 
     def close(self):

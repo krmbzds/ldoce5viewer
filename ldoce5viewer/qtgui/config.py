@@ -174,7 +174,7 @@ class __Config(object):
                 self._dict.clear()
                 try:
                     data = pickle.load(f)
-                except:
+                except Exception:
                     pass
                 else:
                     self._dict.update(data)

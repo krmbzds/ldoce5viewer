@@ -9,8 +9,8 @@ from html import escape
 from struct import Struct
 
 import lxml.etree as et
-from PySide6.QtCore import *
-from PySide6.QtWidgets import *
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from .. import __version__, fulltext, incremental
 from ..ldoce5 import filemap, idmreader
@@ -60,7 +60,7 @@ class IndexerDialog(QDialog):
                     path.append(os.path.join(value, "ldoce5.data"))
             finally:
                 _winreg.CloseKey(k)
-        except:
+        except Exception:
             pass
 
         if "ProgramFiles" in os.environ:
@@ -238,7 +238,7 @@ class IndexingThread(QThread):
                 self._srcdir, "activator.skn", "alpha_index.skn", "LABEL.tda"
             )
             with open(act_label_path, "rb") as f:
-                labels = f.read().split(b"\0")[:-1]
+                _labels = f.read().split(b"\0")[:-1]
 
             # activator sections
             sections = {}
@@ -471,7 +471,7 @@ class IndexingThread(QThread):
             try:
                 self._message("Removing files...")
                 self._remove_all()
-            except:
+            except Exception:
                 pass
         else:
             self._succeeded = True

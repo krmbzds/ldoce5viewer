@@ -13,9 +13,21 @@ except ImportError:
     pass
 import webbrowser
 
+from PySide6.QtCore import QSize, Qt, QTimer, QUrl, QUrlQuery
+from PySide6.QtGui import QAction, QActionGroup, QClipboard, QIcon, QKeySequence
+from PySide6.QtNetwork import QNetworkReply, QNetworkRequest
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWebEngineCore import QWebEngineFindTextResult, QWebEngineUrlScheme
-from PySide6.QtWidgets import *
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QCompleter,
+    QDialog,
+    QFileDialog,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+)
 
 try:
     import Cocoa
@@ -23,8 +35,6 @@ try:
 except ImportError:
     objc = None
 
-from PySide6.QtCore import *
-from PySide6.QtGui import *
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 
 from .. import fulltext, incremental
@@ -683,7 +693,7 @@ class MainWindow(QMainWindow):
                 title = ellipsis(title, 20)
                 try:
                     menu.addAction(title, make_goto(idx))
-                except:
+                except Exception:
                     pass
             menu.setEnabled(bool(menu.actions()))
 
@@ -1297,24 +1307,24 @@ class MainWindow(QMainWindow):
                 self.restoreGeometry(config["windowGeometry"])
             if "splitterSizes" in config:
                 ui.splitter.restoreState(config["splitterSizes"])
-        except:
+        except Exception:
             pass
 
         try:
             pron = config.get("autoPronPlayback", None)
             acts = {"US": self._ui.actionPronUS, "GB": self._ui.actionPronGB}
             acts.get(pron, self._ui.actionPronOff).setChecked(True)
-        except:
+        except Exception:
             pass
 
         try:
             ui.actionMonitorClipboard.setChecked(config.get("monitorClipboard", False))
-        except:
+        except Exception:
             pass
 
         try:
             self.setZoom(0, relative=True)
-        except:
+        except Exception:
             pass
 
     def _save_to_configfile(self):
