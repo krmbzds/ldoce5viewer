@@ -1,0 +1,5 @@
+# Development / CI dependencies (non-GUI)
+pytest>=7.4
+ruff>=0.4
+Whoosh>=2.7.4
+lxml>=4.9.1
