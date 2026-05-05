@@ -11,6 +11,7 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
+use unicode_width::UnicodeWidthStr;
 
 use crate::content::types::ContentType;
 
@@ -78,10 +79,12 @@ impl Block {
     /// Append frequency-badge text — each FREQ element gets its own Badge
     /// inline so that "[S1] [W2]" are rendered as two separate pills.
     fn push_badge(&mut self, text: &str) {
-        if text.is_empty() {
+        // Trim and ignore empty/whitespace-only badges
+        let t = text.trim();
+        if t.is_empty() {
             return;
         }
-        self.inlines.push(Inline::Badge { text: text.to_owned() });
+        self.inlines.push(Inline::Badge { text: t.to_owned() });
     }
 
     /// Append signpost text, merging with an adjacent Signpost if present.
@@ -92,7 +95,9 @@ impl Block {
         if let Some(Inline::Signpost { text: existing }) = self.inlines.last_mut() {
             existing.push_str(text);
         } else {
-            self.inlines.push(Inline::Signpost { text: text.to_owned() });
+            self.inlines.push(Inline::Signpost {
+                text: text.to_owned(),
+            });
         }
     }
 
@@ -207,27 +212,35 @@ fn style_dim() -> Style {
         .fg(rgb(121, 112, 169)) // comment purple
         .add_modifier(Modifier::DIM)
 }
-/// Style for frequency/corpus badges [S1] [W2] [AC].
-/// Bright green, bold, with dark background to simulate the rounded pill on
-/// the LDOCE web page.
-fn style_badge() -> Style {
+/// Badge styling: provide separate styles for the bracket (border) and the
+/// inner pill so we can visually separate the letter(s) with a small "border".
+fn style_badge_border() -> Style {
+    // light gray bracket color
     Style::default()
-        .fg(rgb(30, 30, 30))        // near-black text
-        .bg(rgb(80, 250, 123))      // Dracula green background
+        .fg(rgb(180, 180, 190))
+        .add_modifier(Modifier::DIM)
+}
+
+fn style_badge_inner() -> Style {
+    // Muted purple background with light foreground for contrast.
+    Style::default()
+        .fg(rgb(248, 248, 242)) // white text
+        .bg(rgb(121, 112, 169)) // #7970A9 muted purple
         .add_modifier(Modifier::BOLD)
 }
 /// Style for signpost labels (e.g. "DRIVING", "CAR JOURNEY").
 fn style_signpost() -> Style {
     Style::default()
-        .fg(rgb(248, 248, 242))     // white text
-        .bg(rgb(63, 115, 115))      // dark teal background (#3f7373)
+        .fg(rgb(248, 248, 242)) // white text
+        .bg(rgb(63, 115, 115)) // dark teal background (#3f7373)
         .add_modifier(Modifier::BOLD)
 }
 /// Style for the text of section box headings (COLLOCATIONS, THESAURUS…).
 fn style_section_heading() -> Style {
+    // Use the requested background color (#7970A9) with light foreground.
     Style::default()
-        .fg(rgb(40, 42, 54))        // dracula background fg (dark)
-        .bg(rgb(80, 250, 123))      // bright green fill
+        .fg(rgb(248, 248, 242)) // light foreground (white)
+        .bg(rgb(121, 112, 169)) // #7970A9
         .add_modifier(Modifier::BOLD)
 }
 
@@ -238,6 +251,35 @@ fn style_section_heading() -> Style {
 /// Convert a `ContentPage` into a ratatui `Text` object.
 pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
     let mut lines: Vec<Line> = Vec::new();
+
+    // Compute maximum prefix width across the whole page (in terminal cells)
+    // so circled numbers and bullets align vertically.
+    let max_prefix = page
+        .iter()
+        .filter_map(|b| {
+            if let Some(Inline::Prefix(s, _)) = b.inlines.get(0) {
+                Some(UnicodeWidthStr::width(s.as_str()))
+            } else {
+                None
+            }
+        })
+        .max()
+        .unwrap_or(0usize);
+
+    // Also compute maximum indentation (in spaces) used by any block. We'll
+    // reserve a fixed prefix column at this horizontal position so circled
+    // numbers are vertically aligned regardless of nesting.
+    let max_indent_spaces = page
+        .iter()
+        .map(|b| (b.indent as usize) * 2)
+        .max()
+        .unwrap_or(0usize);
+
+    // Prefix column configuration: fixed left margin, a fixed inner width
+    // (based on the widest prefix), and one separator cell.
+    let prefix_col_margin: usize = 2;
+    let prefix_col_width: usize = std::cmp::max(1, max_prefix);
+    let prefix_col_total: usize = prefix_col_margin + prefix_col_width + 1;
 
     for block in page.iter() {
         let indent_str = if block.indent > 0 {
@@ -254,18 +296,34 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
             start_idx = 1;
         }
 
-        // Compute prefix pad length for continuation lines
-        let prefix_pad = prefix_opt
-            .as_ref()
-            .map(|(s, _)| s.chars().count())
-            .unwrap_or(0);
+        // prefix column totals are handled via `prefix_col_*` variables above.
 
-        // For section heading blocks (COLLOCATIONS, THESAURUS etc.) insert a
-        // blank separator line and render the heading with a colored bar.
+        // For section heading blocks (COLLOCATIONS, THESAURUS etc.) render the
+        // heading inline but aligned with the following text. Use a subtler
+        // background and avoid inserting an extra blank line above the header.
         if block.is_heading {
-            // Blank separator before the heading
-            lines.push(Line::from(vec![Span::raw("")]));
-            // Collect all inline text for the heading bar
+            // Render heading aligned with the content column after the prefix column.
+            let mut current: Vec<Span> = Vec::new();
+            // Prefix column (left margin + prefix cell)
+            current.push(Span::raw(" ".repeat(prefix_col_margin)));
+            if let Some((ps, pst)) = &prefix_opt {
+                let cur_w = UnicodeWidthStr::width(ps.as_str());
+                if prefix_col_width > cur_w {
+                    current.push(Span::raw(" ".repeat(prefix_col_width - cur_w)));
+                }
+                current.push(Span::styled(ps.clone(), *pst));
+                // separation space between prefix column and content
+                current.push(Span::raw(" "));
+            } else {
+                // empty prefix cell + separation
+                current.push(Span::raw(" ".repeat(prefix_col_width + 1)));
+            }
+            // Now the block's own indentation
+            if !indent_str.is_empty() {
+                current.push(Span::raw(indent_str.clone()));
+            }
+
+            // Collect all inline text for the heading
             let heading_text: String = block
                 .inlines
                 .iter()
@@ -275,19 +333,38 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
                     _ => None,
                 })
                 .collect::<Vec<_>>()
-                .join("");
-            let bar = format!(" ╔═ {} ═╗ ", heading_text.trim());
-            lines.push(Line::from(vec![Span::styled(bar, style_section_heading())]));
+                .join("")
+                .trim()
+                .to_string();
+
+            if !heading_text.is_empty() {
+                // Use uppercase and subtle padding for clarity
+                let label = format!(" {} ", heading_text.to_uppercase());
+                current.push(Span::styled(label, style_section_heading()));
+                lines.push(Line::from(current));
+            }
             continue;
         }
 
-        // Build the first line (with indentation and optional prefix)
+        // Build the first line (prefix column + indentation + content)
         let mut current: Vec<Span> = Vec::new();
+        // Prefix column (left margin + prefix cell)
+        current.push(Span::raw(" ".repeat(prefix_col_margin)));
+        if let Some((ps, pst)) = &prefix_opt {
+            let cur_w = UnicodeWidthStr::width(ps.as_str());
+            if prefix_col_width > cur_w {
+                current.push(Span::raw(" ".repeat(prefix_col_width - cur_w)));
+            }
+            current.push(Span::styled(ps.clone(), *pst));
+            // separation space between prefix column and content
+            current.push(Span::raw(" "));
+        } else {
+            // empty prefix cell + separation
+            current.push(Span::raw(" ".repeat(prefix_col_width + 1)));
+        }
+        // Now the block's own indentation (content starts after prefix column)
         if !indent_str.is_empty() {
             current.push(Span::raw(indent_str.clone()));
-        }
-        if let Some((ps, pst)) = &prefix_opt {
-            current.push(Span::styled(ps.clone(), *pst));
         }
 
         for inline in block.inlines.iter().skip(start_idx) {
@@ -316,22 +393,35 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
                     lines.push(Line::from(std::mem::take(&mut current)));
                     // start a new current line that aligns under the text start
                     current = Vec::new();
+                    // prefix column empty (margin + cell + sep)
+                    current.push(Span::raw(
+                        " ".repeat(prefix_col_margin + prefix_col_width + 1),
+                    ));
+                    // Now add the block's indentation so wrapped lines align
                     if !indent_str.is_empty() {
                         current.push(Span::raw(indent_str.clone()));
-                    }
-                    if prefix_pad > 0 {
-                        current.push(Span::raw(" ".repeat(prefix_pad)));
                     }
                 }
                 Inline::Prefix(_, _) => {
                     // Shouldn't appear here — we handled leading Prefix above.
                 }
                 Inline::Badge { text } => {
-                    // Render as [S1] with pill-like badge style
-                    current.push(Span::styled(
-                        format!(" [{}]", text.trim()),
-                        style_badge(),
-                    ));
+                    // Render as a pill with a subtle bracket "border" and a
+                    // colored inner background. Trim and skip empty badges.
+                    let t = text.trim();
+                    if t.is_empty() {
+                        continue;
+                    }
+                    // leading space for separation
+                    current.push(Span::raw(" "));
+                    // left bracket (border)
+                    current.push(Span::styled("[", style_badge_border()));
+                    // inner pill with padding
+                    current.push(Span::styled(format!(" {} ", t), style_badge_inner()));
+                    // right bracket (border)
+                    current.push(Span::styled("]", style_badge_border()));
+                    // trailing space
+                    current.push(Span::raw(" "));
                 }
                 Inline::Signpost { text } => {
                     // Render as ■ LABEL ■ with teal background style
@@ -723,7 +813,9 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 } else if is_sensenum {
                     // Convert plain number to circled unicode character
                     let circled = to_circled_number(text);
-                    current_block.push_text(&format!(" {} ", circled.trim()), style);
+                    // Store circled number without extra surrounding spaces; renderer will
+                    // place it in the fixed prefix column.
+                    current_block.push_text(&format!("{}", circled.trim()), style);
                 } else if is_freq {
                     // Frequency/corpus badge: render as [S1], [W2], [AC] etc.
                     current_block.push_badge(text);
@@ -774,8 +866,8 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
             }
             if let Some((i, ch)) = byte_idx {
                 if is_circled(ch) {
-                    // prefix is the circled character (and a following space)
-                    let prefix = format!("{} ", ch);
+                    // prefix is the circled character (store without trailing space)
+                    let prefix = ch.to_string();
                     // compute rest of string after the circled char
                     let next = i + ch.len_utf8();
                     let rest = s[next..].trim_start().to_string();
@@ -788,7 +880,7 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     b.inlines.insert(0, Inline::Prefix(prefix, style_pos()));
                 } else if is_bullet(ch) {
                     // replace bullet with a triangular play bullet used on the site
-                    let prefix = "▶ ".to_string();
+                    let prefix = "▶".to_string();
                     // compute rest
                     let next = i + ch.len_utf8();
                     let rest = s[next..].trim_start().to_string();
