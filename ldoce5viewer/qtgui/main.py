@@ -1005,6 +1005,38 @@ class MainWindow(QMainWindow):
             self._ui.lineEditSearch.setText(text)
             self._instantSearch(pending=True, delay=False)
 
+            # If indexing indicated a restart is needed, automatically restart the app.
+            try:
+                needs_restart = getattr(dialog, "_needs_restart", False)
+            except Exception:
+                needs_restart = False
+            if needs_restart:
+                # Replace the current process with a new one using execv so
+                # SingleApplication does not block the new instance. If execv
+                # fails, fall back to spawning a new process and quitting.
+                try:
+                    import os
+                    import sys
+
+                    python = sys.executable
+                    os.execv(python, [python] + sys.argv)
+                except Exception:
+                    try:
+                        import subprocess
+                        import sys
+
+                        python = sys.executable
+                        args = [python] + sys.argv
+                        subprocess.Popen(args)
+                    except Exception:
+                        pass
+                    # Ensure the current application exits
+                    self.close()
+                    from PySide6.QtWidgets import QApplication
+
+                    QApplication.quit()
+                    return
+
         # Restore the value of monitorClipboard
         config["monitorClipboard"] = mc_enabled
 

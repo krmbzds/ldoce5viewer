@@ -137,6 +137,8 @@ class IndexerDialog(QDialog):
         config.save()
         self.setWindowTitle("Done")
         QMessageBox.information(self, "Done", "Index successfully created!")
+        # Mark that indexing completed and a restart may be necessary
+        self._needs_restart = True
         self.accept()
 
     def _threadFailed(self):

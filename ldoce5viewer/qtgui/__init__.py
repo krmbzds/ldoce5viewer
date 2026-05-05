@@ -26,6 +26,73 @@ if not hasattr(QLineEdit, "setPlaceholderText"):
     setattr(QLineEdit, "setPlaceholderText", _dummySetPlaceholderText)
 
 
+# Ensure generated UI and resource python files exist when running from source
+# (this helps developers who forget to run the precompile step).
+if not getattr(sys, "frozen", False):
+    try:
+        _here = os.path.dirname(__file__)
+        _ui_dir = os.path.join(_here, "ui")
+        _res_dir = os.path.join(_here, "resources")
+        _need_gen = False
+        # check for at least the main generated ui and resources module
+        if not os.path.exists(os.path.join(_ui_dir, "main.py")):
+            _need_gen = True
+        if not os.path.exists(os.path.join(_res_dir, "__init__.py")):
+            _need_gen = True
+        if _need_gen:
+            print("Generating Qt .py UI wrappers and resources (pyside6-uic / pyside6-rcc)...")
+            # Prefer pyside6 module entrypoints, fallback to CLI on PATH
+            import shutil
+            import subprocess
+
+            pyside6_uic = None
+            pyside6_rcc = None
+            try:
+                import importlib
+
+                if importlib.util.find_spec("PySide6.scripts.uic"):
+                    pyside6_uic = [sys.executable, "-m", "PySide6.scripts.uic"]
+                if importlib.util.find_spec("PySide6.scripts.rcc"):
+                    pyside6_rcc = [sys.executable, "-m", "PySide6.scripts.rcc"]
+            except Exception:
+                pass
+            if pyside6_uic is None:
+                uic_bin = shutil.which("pyside6-uic")
+                if uic_bin:
+                    pyside6_uic = [uic_bin]
+            if pyside6_rcc is None:
+                rcc_bin = shutil.which("pyside6-rcc")
+                if rcc_bin:
+                    pyside6_rcc = [rcc_bin]
+
+            if pyside6_uic is None or pyside6_rcc is None:
+                raise RuntimeError(
+                    "PySide6 uic/rcc not found in environment. Please install PySide6 and ensure pyside6-uic and pyside6-rcc are on PATH or available as module entrypoints."
+                )
+
+            # Generate all .ui files
+            for ui_file in os.listdir(_ui_dir):
+                if ui_file.endswith(".ui"):
+                    src = os.path.join(_ui_dir, ui_file)
+                    dst = os.path.join(_ui_dir, ui_file[:-3] + "py")
+                    cmd = pyside6_uic + [src, "-o", dst]
+                    subprocess.check_call(cmd)
+            # Generate resources
+            qrc = os.path.join(_res_dir, "resource.qrc")
+            if os.path.exists(qrc):
+                dst = os.path.join(_res_dir, "__init__.py")
+                cmd = pyside6_rcc + [qrc, "-o", dst]
+                subprocess.check_call(cmd)
+            print("Generation complete.")
+    except Exception as _e:
+        # If generation failed, raise a helpful ImportError so the user sees instructions
+        raise ImportError(
+            "Failed to generate Qt UI/resources: {0}.\nPlease run 'pyside6-uic' and 'pyside6-rcc' manually or run 'make precompile'.".format(
+                _e
+            )
+        )
+
+# Finally import package resources and ui (ui __init__ no longer eagerly imports submodules)
 from . import resources, ui  # noqa: E402, F401
 
 
