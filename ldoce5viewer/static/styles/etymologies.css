@@ -25,3 +25,7 @@
     font-size: small;
     vertical-align: super;
 }
+
+@media (prefers-color-scheme: dark) {
+.origin { color: #4ec9b0; }
+} /* end of @media (prefers-color-scheme: dark) */

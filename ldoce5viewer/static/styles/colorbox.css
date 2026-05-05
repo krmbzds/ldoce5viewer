@@ -40,3 +40,9 @@
         .cboxSlideshow_on #cboxSlideshow:hover{background-position:-100px -25px;}
         .cboxSlideshow_off #cboxSlideshow{background-position:-100px 0px; right:44px;}
         .cboxSlideshow_off #cboxSlideshow:hover{background-position:-75px -25px;}
+
+@media (prefers-color-scheme: dark) {
+#cboxOverlay { background: #1e1e1e; }
+.cboxIframe { background: #1e1e1e; }
+#cboxTitle { color: #d4d4d4; }
+}

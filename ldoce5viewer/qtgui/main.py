@@ -47,6 +47,7 @@ from .config import get_config
 from .indexer import IndexerDialog
 from .ui.custom import LineEdit, ToolButton
 from .ui.main import Ui_MainWindow
+from .utils import is_dark_mode as _is_dark_mode
 
 # Config
 _INDEX_SUPPORTED = "2013.02.25"
@@ -68,6 +69,36 @@ _LAZY_PRINTER = "printer"
 
 
 _IS_OSX = sys.platform.startswith("darwin")
+
+
+_LIST_CSS_DARK = """\
+body {
+    color: #aaaaaa;
+    font-size: 13px;
+    font-family: "Trebuchet MS", sans-serif;
+}
+
+.p  { color: #888888; font-size: 12px; font-style: italic; }
+.s  { vertical-align: super; }
+
+.h { color: #cc8855; }
+.n { font-weight: bold; }
+.f { font-weight: bold; }
+.pv { font-weight: bold; }
+.v { }
+
+.a { }
+.a .e { color: #4ec9b0; font-weight: bold; }
+.a .c { font-weight: bold; font-size: 12px; letter-spacing: 1px; }
+
+.c { }
+.c .o { color: #bbbbbb; }
+.c .p { color: #888888; }
+
+.l { }
+.l .o { color: #cc8855; font-weight: bold; }
+.l .p { color: #888888; }
+"""
 
 
 def _incr_delay_func(count):
@@ -148,9 +179,11 @@ class MainWindow(QMainWindow):
 
         # Stylesheet for the item list pane
         try:
-            self._ui.listWidgetIndex.setStyleSheet(
-                _load_static_data("styles/list.css").decode("utf-8", "ignore")
-            )
+            if _is_dark_mode():
+                list_css = _LIST_CSS_DARK
+            else:
+                list_css = _load_static_data("styles/list.css").decode("utf-8", "ignore")
+            self._ui.listWidgetIndex.setStyleSheet(list_css)
         except EnvironmentError:
             pass
 

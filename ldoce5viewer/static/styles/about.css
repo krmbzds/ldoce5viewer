@@ -32,3 +32,11 @@ a.external:hover {
     background-image: url("static:///images/external-hover.png");
 }
 
+@media (prefers-color-scheme: dark) {
+body { color: #d4d4d4; background-color: #1e1e1e; }
+h1 { border-bottom-color: #555; }
+h2 { border-bottom-color: #555; }
+a { color: #4ec9b0; }
+a:hover { color: #f48771; }
+} /* end of @media (prefers-color-scheme: dark) */
+
