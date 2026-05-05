@@ -633,25 +633,26 @@ class MainWindow(QMainWindow):
         if not os.path.exists(anki_media_dir):
             os.mkdir(anki_media_dir)
 
-        with open(os.path.join(anki_dir, "anki.txt"), "a") as f:
+        with open(os.path.join(anki_dir, "anki.txt"), "a", encoding="utf-8") as f:
             header, meaning = self._ui.webView.copyToAnki
 
-            audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', header))
-            audio_urls.extend(re.findall(r'href="audio://([^"]*\.mp3)"', meaning))
+            audio_urls.extend(re.findall(r'href="audio://([^\"]*\.mp3)"', header))
+            audio_urls.extend(re.findall(r'href="audio://([^\"]*\.mp3)"', meaning))
 
             header = re.sub(
-                r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/"]*?\.mp3)" title="([^"]+)"><img src="[^"]+"></a>',
-                r'<a class="audio" title="\2">[sound:\1]</a>',
+                r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/\"]*?\.mp3)" title="([^\"]+)"><img src="[^\"]+"></a>',
+                r'<a class="audio" title="\\2">[sound:\\1]</a>',
                 header,
             )
             meaning = re.sub(
-                r'<a class="audio" href="audio:///exa_pron/([^/"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>',
-                r'<a class="audio" title="Play">[sound:\1]</a>',
+                r'<a class="audio" href="audio:///exa_pron/([^/\"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>',
+                r'<a class="audio" title="Play">[sound:\\1]</a>',
                 meaning,
             )
 
             line = header + "\t" + meaning + "\n"
-            f.write(line.encode("UTF-8"))
+            # write as UTF-8 text
+            f.write(line)
 
         def saveAudioFile(data, filename):
             file = open(os.path.join(anki_media_dir, filename), "wb")

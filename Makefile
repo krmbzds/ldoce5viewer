@@ -32,9 +32,10 @@ clean: clean-build
 	cd $(PKG)/qtgui/resources/; $(MAKE) clean
 
 clean-build:
-	rm -rf build
-	rm -rf dist
-	rm -f MANIFEST
+	# Robustly remove build/ and dist/ even if files have immutable flags or odd permissions
+	-@if [ -d build ]; then chflags -R nouchg build 2>/dev/null || true; chmod -R u+w build 2>/dev/null || true; rm -rf build 2>/dev/null || true; fi
+	-@if [ -d dist ]; then chflags -R nouchg dist 2>/dev/null || true; chmod -R u+w dist 2>/dev/null || true; find dist -mindepth 1 -maxdepth 1 -exec rm -rf '{}' \; 2>/dev/null || true; rmdir dist 2>/dev/null || true; fi
+	-@rm -f MANIFEST
 
 # Create a macOS DMG. Depends on the built .app (build target creates the .app).
 # This target uses the create-dmg helper if available; otherwise falls back to hdiutil.
