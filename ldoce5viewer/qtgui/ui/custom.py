@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QTextDocument
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPalette, QTextDocument
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (
@@ -16,12 +16,14 @@ from PySide6.QtWidgets import (
 )
 
 from ...utils.text import ellipsis
+from ..utils import is_dark_mode as _is_dark_mode
 
 DisplayRole = Qt.ItemDataRole.DisplayRole
 State_Selected = QStyle.StateFlag.State_Selected
 
 
-INDEX_SELECTED_COLOR = QColor(228, 228, 228)
+_BG_COLOR_DARK = "#1e1e1e"
+_BG_COLOR_LIGHT = "white"
 
 
 class ToolButton(QToolButton):
@@ -142,7 +144,8 @@ class HtmlListWidget(QListWidget):
             painter.resetTransform()
             rect = option.rect
             if option.state & State_Selected:
-                painter.fillRect(rect, INDEX_SELECTED_COLOR)
+                highlight = option.palette.color(QPalette.ColorRole.Highlight)
+                painter.fillRect(rect, highlight)
             doc.setHtml(index.data(DisplayRole))
             px = rect.x() + self.MARGIN_H
             py = rect.y() + self.MARGIN_V
@@ -165,7 +168,8 @@ class HtmlListWidget(QListWidget):
 
     def __init__(self, parent):
         super(HtmlListWidget, self).__init__(parent)
-        QListWidget.setStyleSheet(self, "QListWidget{background-color: white;}")
+        bg = _BG_COLOR_DARK if _is_dark_mode() else _BG_COLOR_LIGHT
+        QListWidget.setStyleSheet(self, "QListWidget{{background-color: {0};}}".format(bg))
         self._item_delegate = HtmlListWidget.HtmlItemDelegate(parent)
         self.setItemDelegate(self._item_delegate)
 
@@ -182,7 +186,9 @@ class WebView(QWebEngineView):
     def __init__(self, parent):
         super(WebView, self).__init__(parent)
 
-        self.setStyleSheet("QWebEngineView{background-color: white;}")
+        bg = _BG_COLOR_DARK if _is_dark_mode() else _BG_COLOR_LIGHT
+        self.setStyleSheet("QWebEngineView{{background-color: {0};}}".format(bg))
+        self.page().setBackgroundColor(QColor(bg))
 
         self._actionSearchText = QAction(self)
         if sys.platform != "darwin":
@@ -240,16 +246,10 @@ class WebView(QWebEngineView):
         actions = menu.actions()
 
         # inserts the "Copy to Anki" action
-        frame = page.frameAt(event.pos())
-        hit_test_result = frame.hitTestContent(event.pos())
-
-        header = frame.findFirstElement(".head").toOuterXml()
-        header = header.replace("\n", "")
-
-        meaning = hit_test_result.enclosingBlockElement().toOuterXml()
-        meaning = meaning.replace("\n", "")
-
-        self._copyToAnki = (header, meaning)
+        # NOTE: frameAt/hitTestContent/findFirstElement were Qt WebKit APIs removed in
+        # Qt5+ WebEngine. Header and meaning context is not available synchronously in
+        # QtWebEngine, so we insert the action with empty context.
+        self._copyToAnki = ("", "")
         menu.insertAction(actions[0] if actions else None, self.actionCopyToAnki)
 
         # inserts the "Download audio" action

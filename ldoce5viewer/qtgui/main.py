@@ -14,7 +14,7 @@ except ImportError:
 import webbrowser
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl, QUrlQuery
-from PySide6.QtGui import QAction, QActionGroup, QClipboard, QGuiApplication, QIcon, QKeySequence, QPalette
+from PySide6.QtGui import QAction, QActionGroup, QClipboard, QIcon, QKeySequence
 from PySide6.QtNetwork import QNetworkReply, QNetworkRequest
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtWebEngineCore import QWebEngineFindTextResult, QWebEngineUrlScheme
@@ -47,6 +47,7 @@ from .config import get_config
 from .indexer import IndexerDialog
 from .ui.custom import LineEdit, ToolButton
 from .ui.main import Ui_MainWindow
+from .utils import is_dark_mode as _is_dark_mode
 
 # Config
 _INDEX_SUPPORTED = "2013.02.25"
@@ -68,19 +69,6 @@ _LAZY_PRINTER = "printer"
 
 
 _IS_OSX = sys.platform.startswith("darwin")
-
-
-def _is_dark_mode():
-    """Detect whether the system is in dark mode at startup."""
-    hints = QGuiApplication.styleHints()
-    if hasattr(hints, "colorScheme"):
-        try:
-            return hints.colorScheme() == Qt.ColorScheme.Dark
-        except AttributeError:
-            pass
-    # Fallback: check palette window background luminance
-    bg = QGuiApplication.palette().color(QPalette.ColorRole.Window)
-    return bg.lightness() < 128
 
 
 _LIST_CSS_DARK = """\
