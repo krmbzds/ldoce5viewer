@@ -12,7 +12,7 @@ use md5::compute as md5_compute;
 use roxmltree::Document;
 
 use ldoce5viewer_tui::config;
-use ldoce5viewer_tui::data::{self, ArchiveReader, ARCHIVE_DIRS, CDBMaker};
+use ldoce5viewer_tui::data::{self, ArchiveReader, CDBMaker, ARCHIVE_DIRS};
 use ldoce5viewer_tui::search::{FulltextMaker, IncrementalMaker};
 
 #[derive(Debug, Clone)]
@@ -81,7 +81,9 @@ fn collect_text(node: roxmltree::Node, exclude: &HashSet<&str>) -> String {
     collapse_space(&out)
 }
 
-fn extract_items_from_entry(entry_data: &[u8]) -> Result<(Vec<Item>, HashMap<String, Vec<String>>)> {
+fn extract_items_from_entry(
+    entry_data: &[u8],
+) -> Result<(Vec<Item>, HashMap<String, Vec<String>>)> {
     let xml = std::str::from_utf8(entry_data).context("entry not utf8")?;
     let doc = Document::parse(xml).context("parse xml")?;
     let root = doc.root_element();
@@ -100,26 +102,44 @@ fn extract_items_from_entry(entry_data: &[u8]) -> Result<(Vec<Item>, HashMap<Str
 
     // HWD base text
     let hwd_base = head
-        .and_then(|h| h.descendants().find(|n| n.is_element() && n.tag_name().name() == "HWD") )
-        .and_then(|hwd| hwd.descendants().find(|n| n.is_element() && n.tag_name().name() == "BASE"))
+        .and_then(|h| {
+            h.descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "HWD")
+        })
+        .and_then(|hwd| {
+            hwd.descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "BASE")
+        })
         .map(|n| collect_text(n, &exclude))
         .unwrap_or_default();
 
     // is_freq
-    let is_freq = head.and_then(|h| h.descendants().find(|n| n.is_element() && n.tag_name().name() == "FREQ")).is_some();
+    let is_freq = head
+        .and_then(|h| {
+            h.descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "FREQ")
+        })
+        .is_some();
 
     // build hwdlabel similar to Python's make_hwd_label
     let mut baselabel = hwd_base.clone();
     // HOMNUM
     if let Some(h) = head {
-        if let Some(homnum) = h.descendants().find(|n| n.is_element() && n.tag_name().name() == "HOMNUM") {
+        if let Some(homnum) = h
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "HOMNUM")
+        {
             let hom = collect_text(homnum, &exclude);
             if !hom.is_empty() {
                 baselabel.push_str(&format!("<s>{}</s>", hom));
             }
         }
     }
-    let mut hwdlabel = if is_freq { format!("<f>{}</f>", baselabel) } else { format!("<n>{}</n>", baselabel) };
+    let mut hwdlabel = if is_freq {
+        format!("<f>{}</f>", baselabel)
+    } else {
+        format!("<n>{}</n>", baselabel)
+    };
     // POS
     if let Some(h) = head {
         let poslist: Vec<String> = h
@@ -146,31 +166,76 @@ fn extract_items_from_entry(entry_data: &[u8]) -> Result<(Vec<Item>, HashMap<Str
     items.push(item);
 
     // Definitions (DEF) -> d
-    for def in root.descendants().filter(|n| n.is_element() && n.tag_name().name() == "DEF") {
+    for def in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "DEF")
+    {
         let text = collect_text(def, &exclude);
-        if text.is_empty() { continue; }
+        if text.is_empty() {
+            continue;
+        }
         // find nearest ancestor with id
         let mut anc = def;
         while anc.attribute("id").is_none() {
-            if let Some(p) = anc.parent() { anc = p; } else { break; }
+            if let Some(p) = anc.parent() {
+                anc = p;
+            } else {
+                break;
+            }
         }
         let pid = anc.attribute("id").unwrap_or("");
-        let fullpath = if pid.is_empty() { path_root.clone() } else { format!("/fs/{}#{}", root_id_short, shorten_id(pid)) };
-        items.push(Item { itemtype: "d".to_string(), label: format!("<h>{}</h>", hwdlabel.clone()), path: fullpath, content: text, sortkey: hwd_base.clone(), asfilter: String::new(), prio: 30 });
+        let fullpath = if pid.is_empty() {
+            path_root.clone()
+        } else {
+            format!("/fs/{}#{}", root_id_short, shorten_id(pid))
+        };
+        items.push(Item {
+            itemtype: "d".to_string(),
+            label: format!("<h>{}</h>", hwdlabel.clone()),
+            path: fullpath,
+            content: text,
+            sortkey: hwd_base.clone(),
+            asfilter: String::new(),
+            prio: 30,
+        });
     }
 
     // Examples
-    for ex in root.descendants().filter(|n| n.is_element() && n.tag_name().name() == "EXAMPLE") {
-        if let Some(base) = ex.descendants().find(|n| n.is_element() && n.tag_name().name() == "BASE") {
+    for ex in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "EXAMPLE")
+    {
+        if let Some(base) = ex
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "BASE")
+        {
             let text = collect_text(base, &exclude);
-            if text.is_empty() { continue; }
+            if text.is_empty() {
+                continue;
+            }
             let mut anc = ex;
             while anc.attribute("id").is_none() {
-                if let Some(p) = anc.parent() { anc = p; } else { break; }
+                if let Some(p) = anc.parent() {
+                    anc = p;
+                } else {
+                    break;
+                }
             }
             let pid = anc.attribute("id").unwrap_or("");
-            let fullpath = if pid.is_empty() { path_root.clone() } else { format!("/fs/{}#{}", root_id_short, shorten_id(pid)) };
-            items.push(Item { itemtype: "e".to_string(), label: format!("<h>{}</h>", hwdlabel.clone()), path: fullpath, content: text, sortkey: hwd_base.clone(), asfilter: String::new(), prio: 20 });
+            let fullpath = if pid.is_empty() {
+                path_root.clone()
+            } else {
+                format!("/fs/{}#{}", root_id_short, shorten_id(pid))
+            };
+            items.push(Item {
+                itemtype: "e".to_string(),
+                label: format!("<h>{}</h>", hwdlabel.clone()),
+                path: fullpath,
+                content: text,
+                sortkey: hwd_base.clone(),
+                asfilter: String::new(),
+                prio: 20,
+            });
         }
     }
 
@@ -179,21 +244,40 @@ fn extract_items_from_entry(entry_data: &[u8]) -> Result<(Vec<Item>, HashMap<Str
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
+
+    // Source directory may be provided as the first argument. If it isn't, try
+    // to auto-discover a likely `ldoce5.data` location.
+    let src_dir: PathBuf = if args.len() > 1 {
+        PathBuf::from(&args[1])
+    } else if let Some(pb) = data::discover_ldoce5_dir() {
+        println!(
+            "Auto-discovered LDOCE5 data directory: \"{}\"",
+            pb.display()
+        );
+        pb
+    } else {
         eprintln!("Usage: build_index /path/to/ldoce5.data [out_data_dir]");
         std::process::exit(2);
-    }
-    let src_dir = PathBuf::from(&args[1]);
-    let out_dir = if args.len() > 2 { PathBuf::from(&args[2]) } else { config::data_dir() };
+    };
 
-    println!("Source: {}", src_dir.display());
-    println!("Output: {}", out_dir.display());
+    let out_dir = if args.len() > 2 {
+        PathBuf::from(&args[2])
+    } else {
+        config::data_dir()
+    };
+
+    println!("Source: \"{}\"", src_dir.display());
+    println!("Output: \"{}\"", out_dir.display());
 
     if !data::is_ldoce5_dir(&src_dir) {
-        return Err(anyhow!("{} does not look like a valid LDOCE5 data directory", src_dir.display()));
+        return Err(anyhow!(
+            "{} does not look like a valid LDOCE5 data directory",
+            src_dir.display()
+        ));
     }
 
-    fs::create_dir_all(&out_dir).with_context(|| format!("create out dir {}", out_dir.display()))?;
+    fs::create_dir_all(&out_dir)
+        .with_context(|| format!("create out dir {}", out_dir.display()))?;
 
     // paths
     let filemap_path = out_dir.join("filemap.cdb");
@@ -214,18 +298,24 @@ fn main() -> Result<()> {
     let mut filemap_maker = CDBMaker::new(f).context("cdb maker")?;
 
     println!("Creating incremental maker...");
-    let mut incr_maker = IncrementalMaker::new(&incremental_path, &incremental_tmp).context("incremental maker")?;
+    let mut incr_maker =
+        IncrementalMaker::new(&incremental_path, &incremental_tmp).context("incremental maker")?;
 
     println!("Creating fulltext makers...");
-    let mut fulltext_hp = FulltextMaker::new(&fulltext_hp_dir).map_err(|e| anyhow!("fulltext hp maker: {:?}", e))?;
-    let mut fulltext_de = FulltextMaker::new(&fulltext_de_dir).map_err(|e| anyhow!("fulltext de maker: {:?}", e))?;
+    let mut fulltext_hp =
+        FulltextMaker::new(&fulltext_hp_dir).map_err(|e| anyhow!("fulltext hp maker: {:?}", e))?;
+    let mut fulltext_de =
+        FulltextMaker::new(&fulltext_de_dir).map_err(|e| anyhow!("fulltext de maker: {:?}", e))?;
 
     // iterate archives
     for &(name, _rel) in ARCHIVE_DIRS.iter() {
         println!("Scanning archive {}...", name);
         let files = match data::list_files(&src_dir, name) {
             Ok(v) => v,
-            Err(e) => { eprintln!("list_files error for {}: {:?}", name, e); continue; }
+            Err(e) => {
+                eprintln!("list_files error for {}: {:?}", name, e);
+                continue;
+            }
         };
 
         // lazily open ArchiveReader when needed
@@ -239,7 +329,9 @@ fn main() -> Result<()> {
                     mapped_name = format!("{}/{}", first, entry.name);
                 }
             } else if name == "fs" || name == "pronpractice" {
-                let arch_reader = arch_reader_opt.get_or_insert_with(|| ArchiveReader::new(&src_dir, name).expect("open arch reader"));
+                let arch_reader = arch_reader_opt.get_or_insert_with(|| {
+                    ArchiveReader::new(&src_dir, name).expect("open arch reader")
+                });
                 match arch_reader.read(entry.location) {
                     Ok(d) => {
                         if let Ok(s) = std::str::from_utf8(&d) {
@@ -256,7 +348,9 @@ fn main() -> Result<()> {
                     Err(_) => {}
                 }
             } else if mapped_name.ends_with(".xml") {
-                let arch_reader = arch_reader_opt.get_or_insert_with(|| ArchiveReader::new(&src_dir, name).expect("open arch reader"));
+                let arch_reader = arch_reader_opt.get_or_insert_with(|| {
+                    ArchiveReader::new(&src_dir, name).expect("open arch reader")
+                });
                 match arch_reader.read(entry.location) {
                     Ok(d) => {
                         if let Ok(s) = std::str::from_utf8(&d) {
@@ -293,31 +387,74 @@ fn main() -> Result<()> {
                 val.extend_from_slice(&(orgs as u32).to_le_bytes());
             }
 
-            filemap_maker.add(key, &val).with_context(|| format!("cdb add {}:{}", name, mapped_name))?;
+            filemap_maker
+                .add(key, &val)
+                .with_context(|| format!("cdb add {}:{}", name, mapped_name))?;
 
             // For fs archive, extract items and index
             if name == "fs" {
-                let arch_reader = arch_reader_opt.get_or_insert_with(|| ArchiveReader::new(&src_dir, name).expect("open arch reader"));
+                let arch_reader = arch_reader_opt.get_or_insert_with(|| {
+                    ArchiveReader::new(&src_dir, name).expect("open arch reader")
+                });
                 match arch_reader.read(entry.location) {
                     Ok(d) => {
                         match extract_items_from_entry(&d) {
                             Ok((items, _vars)) => {
                                 for it in items {
                                     let firstc = it.itemtype.chars().next().unwrap_or('?');
-                                    if firstc == 'p' || firstc == 'h' || firstc == 'a' || it.itemtype == "hm" {
+                                    if firstc == 'p'
+                                        || firstc == 'h'
+                                        || firstc == 'a'
+                                        || it.itemtype == "hm"
+                                    {
                                         // add to incremental and fulltext_hp
-                                        incr_maker.add_item(&it.content, &it.itemtype, &it.label, &it.path, it.prio).context("incr add")?;
-                                        fulltext_hp.add_item(&it.itemtype, &it.content, &it.asfilter, &it.label, &it.path, it.prio as u64, &it.sortkey).map_err(|e| anyhow!("fulltext hp add: {:?}", e))?;
+                                        incr_maker
+                                            .add_item(
+                                                &it.content,
+                                                &it.itemtype,
+                                                &it.label,
+                                                &it.path,
+                                                it.prio,
+                                            )
+                                            .context("incr add")?;
+                                        fulltext_hp
+                                            .add_item(
+                                                &it.itemtype,
+                                                &it.content,
+                                                &it.asfilter,
+                                                &it.label,
+                                                &it.path,
+                                                it.prio as u64,
+                                                &it.sortkey,
+                                            )
+                                            .map_err(|e| anyhow!("fulltext hp add: {:?}", e))?;
                                     }
                                     if it.itemtype == "d" || it.itemtype == "e" {
-                                        fulltext_de.add_item(&it.itemtype, &it.content, &it.asfilter, &it.label, &it.path, it.prio as u64, &it.sortkey).map_err(|e| anyhow!("fulltext de add: {:?}", e))?;
+                                        fulltext_de
+                                            .add_item(
+                                                &it.itemtype,
+                                                &it.content,
+                                                &it.asfilter,
+                                                &it.label,
+                                                &it.path,
+                                                it.prio as u64,
+                                                &it.sortkey,
+                                            )
+                                            .map_err(|e| anyhow!("fulltext de add: {:?}", e))?;
                                     }
                                 }
                             }
-                            Err(e) => { eprintln!("warning: extract item failed for {}: {:?}", mapped_name, e); }
+                            Err(e) => {
+                                eprintln!(
+                                    "warning: extract item failed for {}: {:?}",
+                                    mapped_name, e
+                                );
+                            }
                         }
                     }
-                    Err(e) => { eprintln!("warning: read fs entry {} failed: {:?}", mapped_name, e); }
+                    Err(e) => {
+                        eprintln!("warning: read fs entry {} failed: {:?}", mapped_name, e);
+                    }
                 }
             }
         }
@@ -327,9 +464,13 @@ fn main() -> Result<()> {
     incr_maker.finalize().context("incr finalize")?;
 
     println!("Committing fulltext hp...");
-    fulltext_hp.commit().map_err(|e| anyhow!("commit hp: {:?}", e))?;
+    fulltext_hp
+        .commit()
+        .map_err(|e| anyhow!("commit hp: {:?}", e))?;
     println!("Committing fulltext de...");
-    fulltext_de.commit().map_err(|e| anyhow!("commit de: {:?}", e))?;
+    fulltext_de
+        .commit()
+        .map_err(|e| anyhow!("commit de: {:?}", e))?;
 
     println!("Finalizing filemap.cdb...");
     filemap_maker.finalize().context("finalize filemap")?;

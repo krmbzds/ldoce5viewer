@@ -25,7 +25,9 @@ pub enum AutoPronLanguage {
 }
 
 impl Default for AutoPronLanguage {
-    fn default() -> Self { AutoPronLanguage::Off }
+    fn default() -> Self {
+        AutoPronLanguage::Off
+    }
 }
 
 /// All persisted application settings.
@@ -60,14 +62,14 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            data_dir:         None,
-            auto_pron:        AutoPronLanguage::Off,
+            data_dir: None,
+            auto_pron: AutoPronLanguage::Off,
             monitor_clipboard: false,
-            index_dir:        None,
-            last_query:       String::new(),
-            terminal_width:   120,
-            terminal_height:  40,
-            content_wrap:     true,
+            index_dir: None,
+            last_query: String::new(),
+            terminal_width: 120,
+            terminal_height: 40,
+            content_wrap: true,
         }
     }
 }
@@ -80,14 +82,14 @@ impl Default for Config {
 pub fn config_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("ldoce5viewer")
+        .join("ldoce5viewer-tui")
 }
 
 /// Returns the application data directory (indices, etc.).
 pub fn data_dir() -> PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("ldoce5viewer")
+        .join("ldoce5viewer-tui")
 }
 
 /// Path to the config JSON file.
@@ -214,10 +216,19 @@ mod tests {
     #[test]
     fn test_auto_pron_serde() {
         let off = serde_json::to_string(&AutoPronLanguage::Off).unwrap();
-        let gb  = serde_json::to_string(&AutoPronLanguage::GB).unwrap();
-        let us  = serde_json::to_string(&AutoPronLanguage::US).unwrap();
-        assert_eq!(serde_json::from_str::<AutoPronLanguage>(&off).unwrap(), AutoPronLanguage::Off);
-        assert_eq!(serde_json::from_str::<AutoPronLanguage>(&gb).unwrap(),  AutoPronLanguage::GB);
-        assert_eq!(serde_json::from_str::<AutoPronLanguage>(&us).unwrap(),  AutoPronLanguage::US);
+        let gb = serde_json::to_string(&AutoPronLanguage::GB).unwrap();
+        let us = serde_json::to_string(&AutoPronLanguage::US).unwrap();
+        assert_eq!(
+            serde_json::from_str::<AutoPronLanguage>(&off).unwrap(),
+            AutoPronLanguage::Off
+        );
+        assert_eq!(
+            serde_json::from_str::<AutoPronLanguage>(&gb).unwrap(),
+            AutoPronLanguage::GB
+        );
+        assert_eq!(
+            serde_json::from_str::<AutoPronLanguage>(&us).unwrap(),
+            AutoPronLanguage::US
+        );
     }
 }
