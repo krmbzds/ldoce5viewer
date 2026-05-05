@@ -37,12 +37,13 @@ impl<'a> Widget for StatusBar<'a> {
 
 fn build_left(app: &App) -> Vec<Span<'static>> {
     let mode_label = match app.mode {
-        AppMode::Searching     => " SEARCH ",
-        AppMode::Normal        => " NORMAL ",
-        AppMode::FindInPage    => " FIND   ",
-        AppMode::AdvancedSearch=> " ADV    ",
-        AppMode::BuildingIndex => " BUILD  ",
-        AppMode::Quit          => " QUIT   ",
+        AppMode::Searching      => " SEARCH ",
+        AppMode::Normal         => " NORMAL ",
+        AppMode::ContentFocused => " CONTENT",
+        AppMode::FindInPage     => " FIND   ",
+        AppMode::AdvancedSearch => " ADV    ",
+        AppMode::BuildingIndex  => " BUILD  ",
+        AppMode::Quit           => " QUIT   ",
     };
     let mode_style = Style::default()
         .bg(Color::Blue)

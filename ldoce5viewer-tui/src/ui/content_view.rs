@@ -20,8 +20,8 @@ pub struct ContentView<'a> {
 
 impl<'a> Widget for ContentView<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let is_active = !matches!(self.app.mode, AppMode::Searching);
-        let border_style = if is_active {
+        let is_focused = matches!(self.app.mode, AppMode::ContentFocused | AppMode::FindInPage);
+        let border_style = if is_focused {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::DarkGray)
@@ -84,23 +84,39 @@ impl<'a> Widget for ContentView<'a> {
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    j / k      Select next / previous result",
+                    "    Tab        Cycle focus: Search → Results → Content",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    Enter      Load selected entry",
+                    "    j / k      Select next / previous result (in Results pane)",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    Ctrl+B     Navigate back",
+                    "    j / k      Scroll content (in Content pane)",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    Ctrl+F     Navigate forward",
+                    "    g / G      Scroll to top / bottom of content",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    /          Find in page (when content focused)",
+                    "    Ctrl+D/U   Scroll content half page down / up",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "    Enter      Load selected entry / play audio button",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "    Ctrl+O     Navigate back",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "    Ctrl+I     Navigate forward",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+                Line::from(vec![Span::styled(
+                    "    /          Find in page (when Content pane focused)",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(

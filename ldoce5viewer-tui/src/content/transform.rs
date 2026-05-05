@@ -125,7 +125,12 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
                     current.push(Span::styled(text.clone(), style_headword()));
                 }
                 Inline::AudioButton { title, .. } => {
-                    current.push(Span::styled(format!("♪[{title}]"), style_audio()));
+                    let emoji = match title.as_str() {
+                        "British"  => "🇬🇧",
+                        "American" => "🇺🇸",
+                        _          => "▶",
+                    };
+                    current.push(Span::styled(format!(" {emoji} "), style_audio()));
                 }
                 Inline::Image { .. } => {
                     // Images cannot be rendered in a TUI; skip silently.
@@ -246,9 +251,21 @@ fn strip_audio_markers(text: &str) -> std::borrow::Cow<str> {
     std::borrow::Cow::Owned(result)
 }
 
-// --------------------------------------------------------------------------
-// Entry transformer
-// --------------------------------------------------------------------------
+/// Convert a sense number string to circled Unicode characters.
+/// Handles 1–20 using Unicode circled digit characters.
+fn to_circled_number(s: &str) -> String {
+    let trimmed = s.trim();
+    match trimmed.parse::<u32>() {
+        Ok(n @ 1..=20) => {
+            // Unicode circled digits: ① = U+2460, ② = U+2461, …, ⑳ = U+2473
+            let base = 0x2460u32;
+            char::from_u32(base + n - 1)
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| s.to_owned())
+        }
+        _ => s.to_owned(),
+    }
+}
 
 /// Transform a dictionary entry XML blob into a `ContentPage`.
 pub fn transform_entry(xml: &[u8]) -> ContentPage {
@@ -288,6 +305,13 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
 
                 let style = style_for_tag(tag, attrs);
                 let indent = if block_tags.contains(tag.as_str()) { depth } else { current_block.indent };
+
+                // Use a more specific tag name for sensenum spans so we can detect them in text nodes
+                let effective_tag = if tag == "span" && attr_get(attrs, "class").as_deref() == Some("sensenum") {
+                    "sensenum".to_owned()
+                } else {
+                    tag.clone()
+                };
 
                 if block_tags.contains(tag.as_str()) {
                     flush(&mut page, &mut current_block);
@@ -335,15 +359,21 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     _ => {}
                 }
 
-                stack.push((tag.clone(), style, depth));
+                stack.push((effective_tag, style, depth));
                 if !block_tags.contains(tag.as_str()) {
                     depth += 1;
                 }
             }
 
             XmlNode::Close { tag } => {
-                if let Some(pos) = stack.iter().rposition(|(t, _, _)| t == tag) {
-                    let (_, style, d) = stack.remove(pos);
+                // A "span" close may correspond to a "sensenum" entry on the stack
+                let search_tag = if tag == "span" && stack.iter().rev().any(|(t, _, _)| t == "sensenum") {
+                    "sensenum"
+                } else {
+                    tag.as_str()
+                };
+                if let Some(pos) = stack.iter().rposition(|(t, _, _)| t == search_tag) {
+                    let (_, _, d) = stack.remove(pos);
                     depth = d;
 
                     if block_tags.contains(tag.as_str()) {
@@ -379,8 +409,17 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     .any(|(t, _, _)| t == "INFLX" || t == "SE_EntryAssets");
                 let is_headword = !inside_inflx
                     && stack.iter().rev().any(|(t, _, _)| t == "HWD" || t == "BASE");
+
+                // Check if we're inside a sensenum span
+                let is_sensenum = stack.iter().rev()
+                    .any(|(t, _, _)| t == "sensenum");
+
                 if is_headword {
                     current_block.push_headword(text);
+                } else if is_sensenum {
+                    // Convert plain number to circled unicode character
+                    let circled = to_circled_number(text);
+                    current_block.push_text(&format!(" {} ", circled.trim()), style);
                 } else {
                     current_block.push_text(text, style);
                 }

@@ -21,6 +21,8 @@ pub enum AppMode {
     Normal,
     /// Keyboard focus is on the search text box.
     Searching,
+    /// Keyboard focus is on the content pane.
+    ContentFocused,
     /// Ctrl+F activated: text search within the content view.
     FindInPage,
     /// Advanced search overlay is shown.
@@ -241,6 +243,8 @@ pub struct App {
     pub content_scroll: usize,
     /// The currently displayed content path.
     pub current_path:   Option<String>,
+    /// Audio buttons in the current page: (block_idx, path, title).
+    pub audio_buttons:  Vec<(usize, String, String)>,
 
     // ── Zoom ──────────────────────────────────────────────────────────────
     /// Zoom level: each integer step multiplies the font size by 1.05.
@@ -297,6 +301,7 @@ impl App {
             content_page:     None,
             content_scroll:   0,
             current_path:     None,
+            audio_buttons:    Vec::new(),
             zoom_power:       0,
             history:          NavHistory::new(),
             adv_phrase:       String::new(),
@@ -413,6 +418,47 @@ impl App {
         self.auto_pron_pending = ContentId::from_path(path)
             .filter(|c| c.content_type == ContentType::Entry)
             .map(|c| c.id.clone());
+        // Extract audio buttons from the page (called after content_page is set)
+        self.rebuild_audio_buttons();
+    }
+
+    /// Extract audio buttons from the current content page.
+    pub fn rebuild_audio_buttons(&mut self) {
+        self.audio_buttons.clear();
+        if let Some(page) = &self.content_page {
+            for (block_idx, block) in page.iter().enumerate() {
+                for inline in &block.inlines {
+                    if let crate::content::Inline::AudioButton { path, title } = inline {
+                        self.audio_buttons.push((block_idx, path.clone(), title.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Play the audio button nearest to (or at) the given block index.
+    pub fn play_nearest_audio(&mut self, near_block: usize) -> bool {
+        if self.audio_buttons.is_empty() { return false; }
+        // Find the closest audio button
+        let best = self.audio_buttons.iter()
+            .min_by_key(|(idx, _, _)| (*idx as isize - near_block as isize).unsigned_abs())
+            .cloned();
+        if let Some((_, path, _)) = best {
+            let parts: Vec<&str> = path.trim_start_matches('/').splitn(2, '/').collect();
+            if parts.len() == 2 {
+                let archive = parts[0].to_owned();
+                let filename = format!("{}.mp3", parts[1]);
+                self._trigger_audio_file(&archive, &filename);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Internal helper – stores the archive/filename request for the main loop to play.
+    /// (audio playing needs data_dir, so we emit a pending request)
+    pub fn request_audio_play(&mut self, archive: String, filename: String) {
+        self.auto_pron_pending = Some(format!("{}/{}", archive, filename));
     }
 
     pub fn navigate_back(&mut self) {
@@ -462,6 +508,10 @@ impl App {
     /// Returns the effective zoom factor (1.05^zoom_power).
     pub fn zoom_factor(&self) -> f32 {
         1.05f32.powi(self.zoom_power)
+    }
+
+    fn _trigger_audio_file(&self, _archive: &str, _filename: &str) {
+        // placeholder – actual play is handled via play_audio_file in main.rs
     }
 
     // ── Find in page ────────────────────────────────────────────────────

@@ -16,7 +16,8 @@ use std::io;
 use std::time::Duration;
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind, MouseButton,
+            EnableMouseCapture, DisableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -34,14 +35,14 @@ use search::{IncrementalSearcher, FulltextSearcher};
 fn setup_terminal() -> io::Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     Terminal::new(backend)
 }
 
 fn teardown_terminal(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) {
     let _ = disable_raw_mode();
-    let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
+    let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture);
     let _ = terminal.show_cursor();
 }
 
@@ -118,11 +119,15 @@ fn run_loop(
         }
 
         if event::poll(Duration::from_millis(50))? {
+            let term_size = {
+                let s = terminal.size().unwrap_or_default();
+                ratatui::layout::Rect::new(0, 0, s.width, s.height)
+            };
             match event::read()? {
-                Event::Key(key)          => handle_key(app, key),
-                Event::Resize(_w, _h)    => { /* terminal will redraw next iteration */ }
-                Event::Mouse(_)          => {}
-                _                        => {}
+                Event::Key(key)       => handle_key(app, key),
+                Event::Resize(_w, _h) => { /* terminal will redraw next iteration */ }
+                Event::Mouse(m)       => handle_mouse(app, m, term_size),
+                _                     => {}
             }
         }
     }
@@ -137,6 +142,7 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     match app.mode {
         AppMode::Searching      => handle_key_searching(app, key),
         AppMode::Normal         => handle_key_normal(app, key),
+        AppMode::ContentFocused => handle_key_content(app, key),
         AppMode::FindInPage     => handle_key_find(app, key),
         AppMode::AdvancedSearch => handle_key_advsearch(app, key),
         AppMode::BuildingIndex  => handle_key_building(app, key),
@@ -148,8 +154,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
 
 fn handle_key_searching(app: &mut App, key: KeyEvent) {
     match (key.modifiers, key.code) {
-        (KeyModifiers::NONE, KeyCode::Esc)
-        | (KeyModifiers::NONE, KeyCode::Tab) => {
+        (KeyModifiers::NONE, KeyCode::Esc) => {
+            app.mode = AppMode::Normal;
+        }
+        (KeyModifiers::NONE, KeyCode::Tab) => {
+            // Tab: Search → Normal (result list)
             app.mode = AppMode::Normal;
         }
         (KeyModifiers::NONE, KeyCode::Enter) => {
@@ -167,6 +176,7 @@ fn handle_key_searching(app: &mut App, key: KeyEvent) {
         (KeyModifiers::NONE, KeyCode::Down)  => {
             app.mode = AppMode::Normal;
             app.select_next();
+            auto_preview(app);
         }
         (KeyModifiers::CONTROL, KeyCode::Char('c'))
         | (KeyModifiers::CONTROL, KeyCode::Char('q')) => {
@@ -192,25 +202,31 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
         | (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
             app.mode = AppMode::Quit;
         }
+        // Tab: Normal (result list) → ContentFocused
+        (KeyModifiers::NONE, KeyCode::Tab) => {
+            app.mode = AppMode::ContentFocused;
+        }
         // Focus search
         (KeyModifiers::NONE, KeyCode::Char('/'))
         | (KeyModifiers::NONE, KeyCode::Char('i')) => {
             app.mode = AppMode::Searching;
         }
-        // Vim-style result navigation
+        // Vim-style result navigation with auto-preview
         (KeyModifiers::NONE, KeyCode::Char('j'))
         | (KeyModifiers::NONE, KeyCode::Down)
         | (KeyModifiers::CONTROL, KeyCode::Char('j'))
         | (KeyModifiers::CONTROL, KeyCode::Down) => {
             app.select_next();
+            auto_preview(app);
         }
         (KeyModifiers::NONE, KeyCode::Char('k'))
         | (KeyModifiers::NONE, KeyCode::Up)
         | (KeyModifiers::CONTROL, KeyCode::Char('k'))
         | (KeyModifiers::CONTROL, KeyCode::Up) => {
             app.select_prev();
+            auto_preview(app);
         }
-        // Load entry
+        // Load entry explicitly
         (KeyModifiers::NONE, KeyCode::Enter)
         | (KeyModifiers::NONE, KeyCode::Char('l')) => {
             if let Some(idx) = app.selected_row {
@@ -219,22 +235,22 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
                 }
             }
         }
-        // Navigation
-        (KeyModifiers::CONTROL, KeyCode::Char('b'))
+        // Navigation – Ctrl+O (back), Ctrl+I (forward)
+        (KeyModifiers::CONTROL, KeyCode::Char('o'))
         | (KeyModifiers::ALT, KeyCode::Left) => {
             app.navigate_back();
             if let Some(path) = app.current_path.clone() {
                 load_entry(app, &path);
             }
         }
-        (KeyModifiers::CONTROL, KeyCode::Char('f'))
+        (KeyModifiers::CONTROL, KeyCode::Char('i'))
         | (KeyModifiers::ALT, KeyCode::Right) => {
             app.navigate_forward();
             if let Some(path) = app.current_path.clone() {
                 load_entry(app, &path);
             }
         }
-        // Content scroll
+        // Content scroll (when result pane focused but content already loaded)
         (KeyModifiers::NONE, KeyCode::PageDown) => app.scroll_down(20),
         (KeyModifiers::NONE, KeyCode::PageUp)   => app.scroll_up(20),
         (KeyModifiers::NONE, KeyCode::Char(' ')) => app.scroll_down(10),
@@ -253,13 +269,23 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
         (KeyModifiers::NONE, KeyCode::Char('-'))   => app.zoom_out(),
         (KeyModifiers::NONE, KeyCode::Char('0'))   => app.zoom_reset(),
 
-        // Audio: GB
+        // Audio: GB – play British pronunciation for current entry
         (KeyModifiers::CONTROL, KeyCode::Char('g')) => {
-            trigger_pron(app, "gb_hwd_pron");
+            if let Some(path) = app.current_path.clone() {
+                if let Some(cid) = content::ContentId::from_path(&path) {
+                    let filename = format!("{}.mp3", cid.id.replace('.', "_"));
+                    play_audio_file(app, "gb_hwd_pron", &filename);
+                }
+            }
         }
-        // Audio: US
+        // Audio: US – play American pronunciation for current entry
         (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
-            trigger_pron(app, "us_hwd_pron");
+            if let Some(path) = app.current_path.clone() {
+                if let Some(cid) = content::ContentId::from_path(&path) {
+                    let filename = format!("{}.mp3", cid.id.replace('.', "_"));
+                    play_audio_file(app, "us_hwd_pron", &filename);
+                }
+            }
         }
 
         // Advanced search
@@ -271,6 +297,89 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
     }
 }
 
+// ── Content-focused mode ─────────────────────────────────────────────────────
+
+fn handle_key_content(app: &mut App, key: KeyEvent) {
+    match (key.modifiers, key.code) {
+        // Quit
+        (KeyModifiers::NONE, KeyCode::Char('q'))
+        | (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
+            app.mode = AppMode::Quit;
+        }
+        // Tab: ContentFocused → Searching
+        (KeyModifiers::NONE, KeyCode::Tab) => {
+            app.mode = AppMode::Searching;
+        }
+        // Focus search
+        (KeyModifiers::NONE, KeyCode::Char('i')) => {
+            app.mode = AppMode::Searching;
+        }
+        // Find in page
+        (KeyModifiers::NONE, KeyCode::Char('/')) => {
+            app.mode = AppMode::FindInPage;
+        }
+        // Scroll down
+        (KeyModifiers::NONE, KeyCode::Char('j'))
+        | (KeyModifiers::NONE, KeyCode::Down) => app.scroll_down(1),
+        // Scroll up
+        (KeyModifiers::NONE, KeyCode::Char('k'))
+        | (KeyModifiers::NONE, KeyCode::Up) => app.scroll_up(1),
+        // go to top
+        (KeyModifiers::NONE, KeyCode::Char('g'))
+        | (KeyModifiers::NONE, KeyCode::Home) => app.scroll_to_top(),
+        // go to bottom
+        (KeyModifiers::NONE, KeyCode::Char('G'))
+        | (KeyModifiers::NONE, KeyCode::End) => app.scroll_to_bottom(),
+        // Half page down
+        (KeyModifiers::CONTROL, KeyCode::Char('d'))
+        | (KeyModifiers::NONE, KeyCode::PageDown) => app.scroll_down(15),
+        // Half page up
+        (KeyModifiers::CONTROL, KeyCode::Char('u'))
+        | (KeyModifiers::NONE, KeyCode::PageUp) => app.scroll_up(15),
+        // Space scroll down
+        (KeyModifiers::NONE, KeyCode::Char(' ')) => app.scroll_down(10),
+        (KeyModifiers::SHIFT, KeyCode::Char(' ')) => app.scroll_up(10),
+        // Enter: play nearest audio button
+        (KeyModifiers::NONE, KeyCode::Enter) => {
+            let near = app.content_scroll;
+            let path_parts = app.audio_buttons.iter()
+                .min_by_key(|(idx, _, _)| (*idx as isize - near as isize).unsigned_abs())
+                .and_then(|(_, path, _)| {
+                    let trimmed = path.trim_start_matches('/');
+                    let mut parts = trimmed.splitn(2, '/');
+                    let archive = parts.next()?.to_owned();
+                    let name = parts.next()?.to_owned();
+                    Some((archive, name))
+                });
+            if let Some((archive, name)) = path_parts {
+                let filename = format!("{name}.mp3");
+                play_audio_file(app, &archive, &filename);
+            }
+        }
+        // Navigation – Ctrl+O (back), Ctrl+I (forward)
+        (KeyModifiers::CONTROL, KeyCode::Char('o'))
+        | (KeyModifiers::ALT, KeyCode::Left) => {
+            app.navigate_back();
+            if let Some(path) = app.current_path.clone() {
+                load_entry(app, &path);
+            }
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('i'))
+        | (KeyModifiers::ALT, KeyCode::Right) => {
+            app.navigate_forward();
+            if let Some(path) = app.current_path.clone() {
+                load_entry(app, &path);
+            }
+        }
+        // Zoom
+        (KeyModifiers::NONE, KeyCode::Char('+'))
+        | (KeyModifiers::NONE, KeyCode::Char('=')) => app.zoom_in(),
+        (KeyModifiers::NONE, KeyCode::Char('-'))   => app.zoom_out(),
+        (KeyModifiers::NONE, KeyCode::Char('0'))   => app.zoom_reset(),
+        _ => {}
+    }
+}
+
 // ── Find-in-page mode ────────────────────────────────────────────────────────
 
 fn handle_key_find(app: &mut App, key: KeyEvent) {
@@ -278,7 +387,7 @@ fn handle_key_find(app: &mut App, key: KeyEvent) {
         (KeyModifiers::NONE, KeyCode::Esc) => {
             app.find_text.clear();
             app.find_matches.clear();
-            app.mode = AppMode::Normal;
+            app.mode = AppMode::ContentFocused;
         }
         (KeyModifiers::NONE, KeyCode::Enter)
         | (KeyModifiers::NONE, KeyCode::Down) => {
@@ -357,6 +466,16 @@ fn run_incremental_search(app: &mut App) {
             })
             .collect();
     }
+
+    // Sort so that exact matches come first, then by sortkey + prio
+    let norm_query = search::normalize_index_key(&query);
+    app.incr_results.sort_by(|a, b| {
+        let a_exact = a.sortkey == norm_query;
+        let b_exact = b.sortkey == norm_query;
+        b_exact.cmp(&a_exact)
+            .then_with(|| a.sortkey.cmp(&b.sortkey))
+            .then_with(|| a.prio.cmp(&b.prio))
+    });
 
     app.rebuild_results();
     app.check_spell();
@@ -494,6 +613,7 @@ fn load_entry(app: &mut App, path: &str) {
     // Transform
     let page = content::transform(cid.content_type, &xml_bytes);
     app.content_page = Some(page);
+    app.rebuild_audio_buttons();
     app.navigate_to(path);
     app.status = String::new();
 
@@ -515,13 +635,87 @@ fn sanitize_for_pron(id: &str) -> String {
     id.replace('.', "_")
 }
 
-fn trigger_pron(app: &mut App, archive: &str) {
-    if let Some(path) = &app.current_path.clone() {
-        if let Some(cid) = ContentId::from_path(path) {
-            let filename = format!("{}.mp3", sanitize_for_pron(&cid.id));
-            play_audio_file(app, archive, &filename);
+/// Auto-preview the currently selected result in the content view.
+fn auto_preview(app: &mut App) {
+    if let Some(idx) = app.selected_row {
+        if let Some(item) = app.results.get(idx).cloned() {
+            load_entry(app, &item.path);
         }
     }
+}
+
+// --------------------------------------------------------------------------
+// Mouse handling
+// --------------------------------------------------------------------------
+
+fn handle_mouse(app: &mut App, m: MouseEvent, term_size: ratatui::layout::Rect) {
+    // Recompute layout for hit-testing
+    let layout = ui::layout::compute_layout(term_size, app);
+
+    let col = m.column;
+    let row = m.row;
+
+    match m.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            if rect_contains(layout.search, col, row) {
+                app.mode = AppMode::Searching;
+            } else if rect_contains(layout.results, col, row) {
+                // Click on result list → select and load that row
+                app.mode = AppMode::Normal;
+                // -1 for the top border of the block
+                let inner_row = row.saturating_sub(layout.results.y + 1) as usize;
+                if inner_row < app.results.len() {
+                    app.selected_row = Some(inner_row);
+                    auto_preview(app);
+                }
+            } else if rect_contains(layout.content, col, row) {
+                // Click on content → try to play nearest audio button to clicked line
+                app.mode = AppMode::ContentFocused;
+                let inner_row = row.saturating_sub(layout.content.y + 1) as usize;
+                let target_line = app.content_scroll + inner_row;
+                // Find the audio button whose block index is closest to target_line
+                let path_parts = app.audio_buttons.iter()
+                    .min_by_key(|(idx, _, _)| (*idx as isize - target_line as isize).unsigned_abs())
+                    .filter(|(idx, _, _)| {
+                        // Only fire if the click is reasonably close to an audio button (within 2 lines)
+                        (*idx as isize - target_line as isize).unsigned_abs() <= 2
+                    })
+                    .and_then(|(_, path, _)| {
+                        let trimmed = path.trim_start_matches('/');
+                        let mut parts = trimmed.splitn(2, '/');
+                        let archive = parts.next()?.to_owned();
+                        let name = parts.next()?.to_owned();
+                        Some((archive, name))
+                    });
+                if let Some((archive, name)) = path_parts {
+                    let filename = format!("{name}.mp3");
+                    play_audio_file(app, &archive, &filename);
+                }
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if rect_contains(layout.results, col, row) {
+                app.select_next();
+                auto_preview(app);
+            } else if rect_contains(layout.content, col, row) {
+                app.scroll_down(3);
+            }
+        }
+        MouseEventKind::ScrollUp => {
+            if rect_contains(layout.results, col, row) {
+                app.select_prev();
+                auto_preview(app);
+            } else if rect_contains(layout.content, col, row) {
+                app.scroll_up(3);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn rect_contains(rect: ratatui::layout::Rect, col: u16, row: u16) -> bool {
+    col >= rect.x && col < rect.x + rect.width &&
+    row >= rect.y && row < rect.y + rect.height
 }
 
 fn play_audio_file(app: &mut App, archive: &str, filename: &str) {
