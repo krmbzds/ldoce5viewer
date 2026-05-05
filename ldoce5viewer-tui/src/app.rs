@@ -241,10 +241,12 @@ pub struct App {
     // ── Content view ──────────────────────────────────────────────────────
     pub content_page:   Option<ContentPage>,
     pub content_scroll: usize,
+    /// Horizontal scroll offset in the content view (columns, used when wrap is off).
+    pub content_scroll_x: u16,
     /// The currently displayed content path.
     pub current_path:   Option<String>,
-    /// Audio buttons in the current page: (block_idx, path, title).
-    pub audio_buttons:  Vec<(usize, String, String)>,
+    /// Audio buttons in the current page: (block_idx, col_start, path, title).
+    pub audio_buttons:  Vec<(usize, u16, String, String)>,
 
     // ── Zoom ──────────────────────────────────────────────────────────────
     /// Zoom level: each integer step multiplies the font size by 1.05.
@@ -300,6 +302,7 @@ impl App {
             find_cursor:      0,
             content_page:     None,
             content_scroll:   0,
+            content_scroll_x: 0,
             current_path:     None,
             audio_buttons:    Vec::new(),
             zoom_power:       0,
@@ -427,9 +430,32 @@ impl App {
         self.audio_buttons.clear();
         if let Some(page) = &self.content_page {
             for (block_idx, block) in page.iter().enumerate() {
+                let mut col = block.indent as usize * 2;
                 for inline in &block.inlines {
-                    if let crate::content::Inline::AudioButton { path, title } = inline {
-                        self.audio_buttons.push((block_idx, path.clone(), title.clone()));
+                    match inline {
+                        crate::content::Inline::AudioButton { path, title } => {
+                            let emoji = match title.as_str() {
+                                "British"  => "🇬🇧",
+                                "American" => "🇺🇸",
+                                _          => "▶",
+                            };
+                            let btn_width = 1 + emoji.chars().count() + 1; // " emoji "
+                            self.audio_buttons.push((block_idx, col as u16, path.clone(), title.clone()));
+                            col += btn_width;
+                        }
+                        crate::content::Inline::Text(t, _) => {
+                            col += t.chars().count();
+                        }
+                        crate::content::Inline::Headword(t) => {
+                            col += t.chars().count();
+                        }
+                        crate::content::Inline::Link { text, .. } => {
+                            col += text.chars().count();
+                        }
+                        crate::content::Inline::LineBreak => {
+                            col = block.indent as usize * 2;
+                        }
+                        crate::content::Inline::Image { .. } => {}
                     }
                 }
             }
@@ -441,9 +467,9 @@ impl App {
         if self.audio_buttons.is_empty() { return false; }
         // Find the closest audio button
         let best = self.audio_buttons.iter()
-            .min_by_key(|(idx, _, _)| (*idx as isize - near_block as isize).unsigned_abs())
+            .min_by_key(|(idx, _, _, _)| (*idx as isize - near_block as isize).unsigned_abs())
             .cloned();
-        if let Some((_, path, _)) = best {
+        if let Some((_, _, path, _)) = best {
             let parts: Vec<&str> = path.trim_start_matches('/').splitn(2, '/').collect();
             if parts.len() == 2 {
                 let archive = parts[0].to_owned();
@@ -499,8 +525,24 @@ impl App {
             .unwrap_or(0);
     }
 
-    // ── Zoom ─────────────────────────────────────────────────────────────
+    pub fn scroll_left(&mut self, cols: u16) {
+        self.content_scroll_x = self.content_scroll_x.saturating_sub(cols);
+    }
 
+    pub fn scroll_right(&mut self, cols: u16) {
+        self.content_scroll_x = self.content_scroll_x.saturating_add(cols);
+    }
+
+    pub fn toggle_wrap(&mut self) {
+        self.config.content_wrap = !self.config.content_wrap;
+        // When wrapping is re-enabled, reset horizontal scroll
+        if self.config.content_wrap {
+            self.content_scroll_x = 0;
+        }
+    }
+
+    // ── Zoom ─────────────────────────────────────────────────────────────
+    // (zoom_power is kept for config compatibility but not actively used)
     pub fn zoom_in(&mut self)  { self.zoom_power = (self.zoom_power + 1).min(20); }
     pub fn zoom_out(&mut self) { self.zoom_power = (self.zoom_power - 1).max(-10); }
     pub fn zoom_reset(&mut self) { self.zoom_power = 0; }

@@ -91,13 +91,9 @@ fn build_right(app: &App) -> Vec<Span<'static>> {
         parts.push(Span::styled("📋 ", Style::default().fg(Color::Magenta)));
     }
 
-    // Zoom level
-    if app.zoom_power != 0 {
-        let sign = if app.zoom_power > 0 { "+" } else { "" };
-        parts.push(Span::styled(
-            format!(" zoom:{sign}{} ", app.zoom_power),
-            Style::default().fg(Color::White),
-        ));
+    // Wrap indicator
+    if app.config.content_wrap {
+        parts.push(Span::styled(" WRAP ", Style::default().fg(Color::DarkGray)));
     }
 
     // Scroll position in content

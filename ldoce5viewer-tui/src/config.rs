@@ -35,9 +35,6 @@ pub struct Config {
     /// Path to the LDOCE5 data directory.
     pub data_dir: Option<PathBuf>,
 
-    /// Content zoom factor (1.0 = 100%).
-    pub zoom: f32,
-
     /// Auto-pronunciation language.
     pub auto_pron: AutoPronLanguage,
 
@@ -55,19 +52,22 @@ pub struct Config {
 
     /// Terminal height saved for session restore.
     pub terminal_height: u16,
+
+    /// Whether to wrap long lines in the content pane.
+    pub content_wrap: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             data_dir:         None,
-            zoom:             1.0,
             auto_pron:        AutoPronLanguage::Off,
             monitor_clipboard: false,
             index_dir:        None,
             last_query:       String::new(),
             terminal_width:   120,
             terminal_height:  40,
+            content_wrap:     true,
         }
     }
 }
@@ -159,27 +159,27 @@ mod tests {
     #[test]
     fn test_default_config() {
         let cfg = Config::default();
-        assert_eq!(cfg.zoom, 1.0);
         assert_eq!(cfg.auto_pron, AutoPronLanguage::Off);
         assert!(!cfg.monitor_clipboard);
         assert!(cfg.data_dir.is_none());
+        assert!(cfg.content_wrap);
     }
 
     #[test]
     fn test_round_trip() {
         let mut cfg = Config::default();
-        cfg.zoom = 1.5;
         cfg.auto_pron = AutoPronLanguage::GB;
         cfg.monitor_clipboard = true;
         cfg.last_query = "hello".to_owned();
+        cfg.content_wrap = false;
 
         let s = serde_json::to_string_pretty(&cfg).unwrap();
         let restored: Config = serde_json::from_str(&s).unwrap();
 
-        assert!((restored.zoom - 1.5).abs() < 1e-6);
         assert_eq!(restored.auto_pron, AutoPronLanguage::GB);
         assert!(restored.monitor_clipboard);
         assert_eq!(restored.last_query, "hello");
+        assert!(!restored.content_wrap);
     }
 
     #[test]
@@ -197,8 +197,8 @@ mod tests {
         let path = dir.path().join("config.json");
 
         let mut cfg = Config::default();
-        cfg.zoom = 2.0;
         cfg.last_query = "world".to_owned();
+        cfg.content_wrap = false;
 
         // Save to path directly (bypass global config_file_path())
         let s = serde_json::to_string_pretty(&cfg).unwrap();
@@ -207,8 +207,8 @@ mod tests {
         // Load from same path
         let s2 = std::fs::read_to_string(&path).unwrap();
         let loaded: Config = serde_json::from_str(&s2).unwrap();
-        assert!((loaded.zoom - 2.0).abs() < 1e-6);
         assert_eq!(loaded.last_query, "world");
+        assert!(!loaded.content_wrap);
     }
 
     #[test]

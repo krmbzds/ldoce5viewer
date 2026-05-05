@@ -54,18 +54,21 @@ impl<'a> Widget for ContentView<'a> {
         if inner.height == 0 || inner.width == 0 { return; }
 
         if let Some(page) = &self.app.content_page {
-            // Render using the pre-built Text; avoid remapping blocks → lines which
-            // previously caused clipping and incorrect scrolling. We clamp the
-            // requested scroll to the number of rendered lines so scrolling behaves
-            // sensibly even when the content wraps to multiple lines.
-            let text = to_ratatui_text(page);
+            // Use find-highlighting renderer when find mode is active, plain otherwise.
+            let text = if !self.app.find_text.is_empty() {
+                build_ratatui_text(page, &self.app.find_text, &self.app.find_matches)
+            } else {
+                to_ratatui_text(page)
+            };
             let total_lines = text.lines.len();
             let scroll_y = if total_lines == 0 { 0 } else { self.app.content_scroll.min(total_lines.saturating_sub(1)) } as u16;
 
-            Paragraph::new(text)
-                .wrap(Wrap { trim: false })
-                .scroll((scroll_y, 0))
-                .render(inner, buf);
+            let para = Paragraph::new(text).scroll((scroll_y, self.app.content_scroll_x));
+            if self.app.config.content_wrap {
+                para.wrap(Wrap { trim: false }).render(inner, buf);
+            } else {
+                para.render(inner, buf);
+            }
         } else {
             // Show a help message when no content is loaded
             let help = Text::from(vec![
@@ -96,6 +99,10 @@ impl<'a> Widget for ContentView<'a> {
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
+                    "    h / l      Scroll left / right (when wrap off)",
+                    Style::default().fg(Color::DarkGray),
+                )]),
+                Line::from(vec![Span::styled(
                     "    g / G      Scroll to top / bottom of content",
                     Style::default().fg(Color::DarkGray),
                 )]),
@@ -120,11 +127,11 @@ impl<'a> Widget for ContentView<'a> {
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    Ctrl+G / Ctrl+U  Play GB / US pronunciation",
+                    "    w          Toggle line wrapping in Content pane",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(
-                    "    + / -      Zoom in / out",
+                    "    Ctrl+G / Ctrl+U  Play GB / US pronunciation",
                     Style::default().fg(Color::DarkGray),
                 )]),
                 Line::from(vec![Span::styled(

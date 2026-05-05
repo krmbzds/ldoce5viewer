@@ -164,10 +164,12 @@ fn handle_key_searching(app: &mut App, key: KeyEvent) {
         (KeyModifiers::NONE, KeyCode::Enter) => {
             app.mode = AppMode::Normal;
             run_incremental_search(app);
+            auto_preview(app);
         }
         (KeyModifiers::NONE, KeyCode::Backspace) => {
             app.backspace();
             run_incremental_search(app);
+            auto_preview(app);
         }
         (KeyModifiers::NONE, KeyCode::Left)  => app.cursor_left(),
         (KeyModifiers::NONE, KeyCode::Right) => app.cursor_right(),
@@ -188,6 +190,7 @@ fn handle_key_searching(app: &mut App, key: KeyEvent) {
         (_, KeyCode::Char(c)) => {
             app.insert_char(c);
             run_incremental_search(app);
+            auto_preview(app);
         }
         _ => {}
     }
@@ -232,6 +235,7 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
             if let Some(idx) = app.selected_row {
                 if let Some(item) = app.results.get(idx).cloned() {
                     load_entry(app, &item.path);
+                    app.mode = AppMode::ContentFocused;
                 }
             }
         }
@@ -263,13 +267,7 @@ fn handle_key_normal(app: &mut App, key: KeyEvent) {
             app.mode = AppMode::FindInPage;
         }
 
-        // Zoom
-        (KeyModifiers::NONE, KeyCode::Char('+'))
-        | (KeyModifiers::NONE, KeyCode::Char('=')) => app.zoom_in(),
-        (KeyModifiers::NONE, KeyCode::Char('-'))   => app.zoom_out(),
-        (KeyModifiers::NONE, KeyCode::Char('0'))   => app.zoom_reset(),
-
-        // Audio: GB – play British pronunciation for current entry
+        // Advanced search
         (KeyModifiers::CONTROL, KeyCode::Char('g')) => {
             if let Some(path) = app.current_path.clone() {
                 if let Some(cid) = content::ContentId::from_path(&path) {
@@ -306,6 +304,10 @@ fn handle_key_content(app: &mut App, key: KeyEvent) {
         | (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
             app.mode = AppMode::Quit;
         }
+        // Esc / Tab: ContentFocused → Normal
+        (KeyModifiers::NONE, KeyCode::Esc) => {
+            app.mode = AppMode::Normal;
+        }
         // Tab: ContentFocused → Searching
         (KeyModifiers::NONE, KeyCode::Tab) => {
             app.mode = AppMode::Searching;
@@ -324,6 +326,11 @@ fn handle_key_content(app: &mut App, key: KeyEvent) {
         // Scroll up
         (KeyModifiers::NONE, KeyCode::Char('k'))
         | (KeyModifiers::NONE, KeyCode::Up) => app.scroll_up(1),
+        // Horizontal scroll (only meaningful when wrap is off)
+        (KeyModifiers::NONE, KeyCode::Char('h'))
+        | (KeyModifiers::NONE, KeyCode::Left) => app.scroll_left(4),
+        (KeyModifiers::NONE, KeyCode::Char('l'))
+        | (KeyModifiers::NONE, KeyCode::Right) => app.scroll_right(4),
         // go to top
         (KeyModifiers::NONE, KeyCode::Char('g'))
         | (KeyModifiers::NONE, KeyCode::Home) => app.scroll_to_top(),
@@ -339,12 +346,14 @@ fn handle_key_content(app: &mut App, key: KeyEvent) {
         // Space scroll down
         (KeyModifiers::NONE, KeyCode::Char(' ')) => app.scroll_down(10),
         (KeyModifiers::SHIFT, KeyCode::Char(' ')) => app.scroll_up(10),
+        // Toggle line wrapping
+        (KeyModifiers::NONE, KeyCode::Char('w')) => app.toggle_wrap(),
         // Enter: play nearest audio button
         (KeyModifiers::NONE, KeyCode::Enter) => {
             let near = app.content_scroll;
             let path_parts = app.audio_buttons.iter()
-                .min_by_key(|(idx, _, _)| (*idx as isize - near as isize).unsigned_abs())
-                .and_then(|(_, path, _)| {
+                .min_by_key(|(idx, _, _, _)| (*idx as isize - near as isize).unsigned_abs())
+                .and_then(|(_, _, path, _)| {
                     let trimmed = path.trim_start_matches('/');
                     let mut parts = trimmed.splitn(2, '/');
                     let archive = parts.next()?.to_owned();
@@ -371,11 +380,6 @@ fn handle_key_content(app: &mut App, key: KeyEvent) {
                 load_entry(app, &path);
             }
         }
-        // Zoom
-        (KeyModifiers::NONE, KeyCode::Char('+'))
-        | (KeyModifiers::NONE, KeyCode::Char('=')) => app.zoom_in(),
-        (KeyModifiers::NONE, KeyCode::Char('-'))   => app.zoom_out(),
-        (KeyModifiers::NONE, KeyCode::Char('0'))   => app.zoom_reset(),
         _ => {}
     }
 }
@@ -669,27 +673,39 @@ fn handle_mouse(app: &mut App, m: MouseEvent, term_size: ratatui::layout::Rect) 
                     auto_preview(app);
                 }
             } else if rect_contains(layout.content, col, row) {
-                // Click on content → try to play nearest audio button to clicked line
+                // Click on content → try to play the audio button closest to the clicked position
                 app.mode = AppMode::ContentFocused;
                 let inner_row = row.saturating_sub(layout.content.y + 1) as usize;
+                // Account for content border (1 col) when computing column offset
+                let inner_col = col.saturating_sub(layout.content.x + 1);
                 let target_line = app.content_scroll + inner_row;
-                // Find the audio button whose block index is closest to target_line
-                let path_parts = app.audio_buttons.iter()
-                    .min_by_key(|(idx, _, _)| (*idx as isize - target_line as isize).unsigned_abs())
-                    .filter(|(idx, _, _)| {
-                        // Only fire if the click is reasonably close to an audio button (within 2 lines)
-                        (*idx as isize - target_line as isize).unsigned_abs() <= 2
-                    })
-                    .and_then(|(_, path, _)| {
+                // Collect audio buttons on or near the target line
+                let path_parts = {
+                    let buttons = &app.audio_buttons;
+                    // First try: button on exact target_line whose column range contains the click
+                    let exact = buttons.iter().find(|(idx, col_start, _, _)| {
+                        *idx == target_line && inner_col >= *col_start
+                    });
+                    // Second try: nearest button by block index, then column
+                    let nearest = buttons.iter()
+                        .filter(|(idx, _, _, _)| {
+                            (*idx as isize - target_line as isize).unsigned_abs() <= 2
+                        })
+                        .min_by_key(|(idx, col_start, _, _)| {
+                            let row_dist = (*idx as isize - target_line as isize).unsigned_abs();
+                            let col_dist = (*col_start as isize - inner_col as isize).unsigned_abs();
+                            row_dist * 1000 + col_dist
+                        });
+                    exact.or(nearest).and_then(|(_, _, path, _)| {
                         let trimmed = path.trim_start_matches('/');
                         let mut parts = trimmed.splitn(2, '/');
                         let archive = parts.next()?.to_owned();
                         let name = parts.next()?.to_owned();
                         Some((archive, name))
-                    });
+                    })
+                };
                 if let Some((archive, name)) = path_parts {
-                    let filename = name;
-                    play_audio_file(app, &archive, &filename);
+                    play_audio_file(app, &archive, &name);
                 }
             }
         }
