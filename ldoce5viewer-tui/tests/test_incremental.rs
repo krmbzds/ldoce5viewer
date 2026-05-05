@@ -3,7 +3,9 @@
 use std::path::Path;
 use tempfile::tempdir;
 
-use ldoce5viewer_tui::search::incremental::{IncrementalMaker, IncrementalSearcher, normalize_index_key};
+use ldoce5viewer_tui::search::incremental::{
+    normalize_index_key, IncrementalMaker, IncrementalSearcher,
+};
 
 // --------------------------------------------------------------------------
 // Helper
@@ -27,33 +29,48 @@ fn build_index(dir: &Path, items: &[(&str, &str, &str, &str, u8)]) -> std::path:
 #[test]
 fn test_round_trip_prefix_match() {
     let dir = tempdir().unwrap();
-    let idx = build_index(dir.path(), &[
-        ("apple",       "hw", "Apple",       "/fs/apple",       0),
-        ("application", "hw", "Application", "/fs/application", 0),
-        ("apply",       "hw", "Apply",       "/fs/apply",       1),
-        ("banana",      "hw", "Banana",      "/fs/banana",      0),
-    ]);
+    let idx = build_index(
+        dir.path(),
+        &[
+            ("apple", "hw", "Apple", "/fs/apple", 0),
+            ("application", "hw", "Application", "/fs/application", 0),
+            ("apply", "hw", "Apply", "/fs/apply", 1),
+            ("banana", "hw", "Banana", "/fs/banana", 0),
+        ],
+    );
     let searcher = IncrementalSearcher::open(&idx).unwrap();
     let results = searcher.search("appl", 100);
     let labels: Vec<&str> = results.iter().map(|r| r.label.as_str()).collect();
-    assert!(labels.contains(&"Apple"),       "Apple should match 'appl'");
-    assert!(labels.contains(&"Application"), "Application should match 'appl'");
-    assert!(labels.contains(&"Apply"),       "Apply should match 'appl'");
-    assert!(!labels.contains(&"Banana"),     "Banana should NOT match 'appl'");
+    assert!(labels.contains(&"Apple"), "Apple should match 'appl'");
+    assert!(
+        labels.contains(&"Application"),
+        "Application should match 'appl'"
+    );
+    assert!(labels.contains(&"Apply"), "Apply should match 'appl'");
+    assert!(
+        !labels.contains(&"Banana"),
+        "Banana should NOT match 'appl'"
+    );
 }
 
 #[test]
 fn test_exact_match() {
     let dir = tempdir().unwrap();
-    let idx = build_index(dir.path(), &[
-        ("run",  "hw", "Run",  "/fs/run",  0),
-        ("runs", "hw", "Runs", "/fs/runs", 0),
-    ]);
+    let idx = build_index(
+        dir.path(),
+        &[
+            ("run", "hw", "Run", "/fs/run", 0),
+            ("runs", "hw", "Runs", "/fs/runs", 0),
+        ],
+    );
     let searcher = IncrementalSearcher::open(&idx).unwrap();
     let results = searcher.search("run", 100);
     let labels: Vec<&str> = results.iter().map(|r| r.label.as_str()).collect();
-    assert!(labels.contains(&"Run"),  "exact match 'run' missing");
-    assert!(labels.contains(&"Runs"), "'runs' is a prefix match of 'run' and should be included");
+    assert!(labels.contains(&"Run"), "exact match 'run' missing");
+    assert!(
+        labels.contains(&"Runs"),
+        "'runs' is a prefix match of 'run' and should be included"
+    );
 }
 
 #[test]
@@ -76,7 +93,15 @@ fn test_empty_query() {
 fn test_limit_respected() {
     let dir = tempdir().unwrap();
     let items: Vec<(String, String, String, String, u8)> = (0u32..50)
-        .map(|i| (format!("word{i:03}"), "hw".to_string(), format!("Word{i}"), format!("/fs/w{i}"), 0))
+        .map(|i| {
+            (
+                format!("word{i:03}"),
+                "hw".to_string(),
+                format!("Word{i}"),
+                format!("/fs/w{i}"),
+                0,
+            )
+        })
         .collect();
     let refs: Vec<(&str, &str, &str, &str, u8)> = items
         .iter()
@@ -103,11 +128,14 @@ fn test_accent_normalisation() {
 fn test_sort_order_prio() {
     let dir = tempdir().unwrap();
     // Same plain text, different priority
-    let idx = build_index(dir.path(), &[
-        ("run", "hw", "Run (prio=2)", "/fs/run2", 2),
-        ("run", "hw", "Run (prio=0)", "/fs/run0", 0),
-        ("run", "hw", "Run (prio=1)", "/fs/run1", 1),
-    ]);
+    let idx = build_index(
+        dir.path(),
+        &[
+            ("run", "hw", "Run (prio=2)", "/fs/run2", 2),
+            ("run", "hw", "Run (prio=0)", "/fs/run0", 0),
+            ("run", "hw", "Run (prio=1)", "/fs/run1", 1),
+        ],
+    );
     let searcher = IncrementalSearcher::open(&idx).unwrap();
     let results = searcher.search("run", 10);
     // Should be sorted: prio=0 first, then 1, then 2
@@ -120,9 +148,10 @@ fn test_sort_order_prio() {
 #[test]
 fn test_result_fields() {
     let dir = tempdir().unwrap();
-    let idx = build_index(dir.path(), &[
-        ("example", "hw", "Example Label", "/dict/example", 3),
-    ]);
+    let idx = build_index(
+        dir.path(),
+        &[("example", "hw", "Example Label", "/dict/example", 3)],
+    );
     let searcher = IncrementalSearcher::open(&idx).unwrap();
     let results = searcher.search("example", 1);
     assert_eq!(results.len(), 1);
@@ -135,12 +164,12 @@ fn test_result_fields() {
 
 #[test]
 fn test_normalize_index_key() {
-    assert_eq!(normalize_index_key("Hello"),    "hello");
+    assert_eq!(normalize_index_key("Hello"), "hello");
     assert_eq!(normalize_index_key("  café  "), "cafe");
-    assert_eq!(normalize_index_key(""),          "");
-    assert_eq!(normalize_index_key("über"),      "uber");
+    assert_eq!(normalize_index_key(""), "");
+    assert_eq!(normalize_index_key("über"), "uber");
     // Copyright sign maps to 'c'
-    assert_eq!(normalize_index_key("\u{00a9}"),  "c");
+    assert_eq!(normalize_index_key("\u{00a9}"), "c");
     // Numbers preserved
-    assert_eq!(normalize_index_key("mp3"),       "mp3");
+    assert_eq!(normalize_index_key("mp3"), "mp3");
 }

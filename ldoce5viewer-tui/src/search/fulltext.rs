@@ -46,28 +46,34 @@ pub enum FulltextError {
 
 #[derive(Clone)]
 pub struct LdoceSchema {
-    pub schema:    Schema,
-    pub content:   Field,
-    pub label:     Field,
-    pub path:      Field,
-    pub prio:      Field,
-    pub sortkey:   Field,
-    pub itemtype:  Field,
-    pub asfilter:  Field,
+    pub schema: Schema,
+    pub content: Field,
+    pub label: Field,
+    pub path: Field,
+    pub prio: Field,
+    pub sortkey: Field,
+    pub itemtype: Field,
+    pub asfilter: Field,
 }
 
 fn build_schema() -> LdoceSchema {
     let mut sb = Schema::builder();
-    let content  = sb.add_text_field("content",  TEXT | STORED);
-    let label    = sb.add_text_field("label",    STORED);
-    let path     = sb.add_text_field("path",     STORED);
-    let prio     = sb.add_u64_field("prio",      STORED);
-    let sortkey  = sb.add_text_field("sortkey",  STORED);
+    let content = sb.add_text_field("content", TEXT | STORED);
+    let label = sb.add_text_field("label", STORED);
+    let path = sb.add_text_field("path", STORED);
+    let prio = sb.add_u64_field("prio", STORED);
+    let sortkey = sb.add_text_field("sortkey", STORED);
     let itemtype = sb.add_text_field("itemtype", STRING);
     let asfilter = sb.add_text_field("asfilter", TEXT);
     LdoceSchema {
         schema: sb.build(),
-        content, label, path, prio, sortkey, itemtype, asfilter,
+        content,
+        label,
+        path,
+        prio,
+        sortkey,
+        itemtype,
+        asfilter,
     }
 }
 
@@ -104,10 +110,10 @@ fn make_analyzer(index: &Index) {
 
 #[derive(Debug, Clone)]
 pub struct FulltextResult {
-    pub label:     String,
-    pub path:      String,
-    pub sortkey:   String,
-    pub prio:      u64,
+    pub label: String,
+    pub path: String,
+    pub sortkey: String,
+    pub prio: u64,
     pub highlight: Option<String>,
 }
 
@@ -116,9 +122,9 @@ pub struct FulltextResult {
 // --------------------------------------------------------------------------
 
 pub struct FulltextMaker {
-    index:  Index,
+    index: Index,
     writer: IndexWriter,
-    s:      LdoceSchema,
+    s: LdoceSchema,
 }
 
 impl FulltextMaker {
@@ -136,23 +142,23 @@ impl FulltextMaker {
     #[allow(clippy::too_many_arguments)]
     pub fn add_item(
         &mut self,
-        itemtype:  &str,
-        content:   &str,
-        asfilter:  &str,
-        label:     &str,
-        path:      &str,
-        prio:      u64,
-        sortkey:   &str,
+        itemtype: &str,
+        content: &str,
+        asfilter: &str,
+        label: &str,
+        path: &str,
+        prio: u64,
+        sortkey: &str,
     ) -> Result<(), FulltextError> {
         let normalised_content = normalize_token(content);
         let normalised_sortkey = normalize_index_key(sortkey);
 
         let mut doc = TantivyDocument::default();
-        doc.add_text(self.s.content,  &normalised_content);
-        doc.add_text(self.s.label,    label);
-        doc.add_text(self.s.path,     path);
-        doc.add_u64(self.s.prio,      prio);
-        doc.add_text(self.s.sortkey,  &normalised_sortkey);
+        doc.add_text(self.s.content, &normalised_content);
+        doc.add_text(self.s.label, label);
+        doc.add_text(self.s.path, path);
+        doc.add_u64(self.s.prio, prio);
+        doc.add_text(self.s.sortkey, &normalised_sortkey);
         doc.add_text(self.s.itemtype, itemtype);
         doc.add_text(self.s.asfilter, asfilter);
 
@@ -172,8 +178,8 @@ impl FulltextMaker {
 // --------------------------------------------------------------------------
 
 pub struct FulltextSearcher {
-    index:  Index,
-    s:      LdoceSchema,
+    index: Index,
+    s: LdoceSchema,
 }
 
 impl FulltextSearcher {
@@ -194,15 +200,17 @@ impl FulltextSearcher {
         // error rather than panicking later.
         let schema = index.schema();
         let get_field = |name: &str| -> Result<Field, FulltextError> {
-            schema.get_field(name).map_err(|_| FulltextError::IndexNotFound)
+            schema
+                .get_field(name)
+                .map_err(|_| FulltextError::IndexNotFound)
         };
         let s = LdoceSchema {
-            schema:   schema.clone(),
-            content:  get_field("content")?,
-            label:    get_field("label")?,
-            path:     get_field("path")?,
-            prio:     get_field("prio")?,
-            sortkey:  get_field("sortkey")?,
+            schema: schema.clone(),
+            content: get_field("content")?,
+            label: get_field("label")?,
+            path: get_field("path")?,
+            prio: get_field("prio")?,
+            sortkey: get_field("sortkey")?,
             itemtype: get_field("itemtype")?,
             asfilter: get_field("asfilter")?,
         };
@@ -217,12 +225,13 @@ impl FulltextSearcher {
     /// * `limit`      – max results (`None` = unlimited, capped at 10 000)
     pub fn search(
         &self,
-        query_str:   Option<&str>,
-        itemtypes:   &[&str],
-        asfilter_q:  Option<&str>,
-        limit:       Option<usize>,
+        query_str: Option<&str>,
+        itemtypes: &[&str],
+        asfilter_q: Option<&str>,
+        limit: Option<usize>,
     ) -> Result<Vec<FulltextResult>, FulltextError> {
-        let reader = self.index
+        let reader = self
+            .index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)
             .try_into()?;
@@ -274,13 +283,20 @@ impl FulltextSearcher {
         let mut results: Vec<FulltextResult> = Vec::with_capacity(top_docs.len());
         for (_score, addr) in top_docs {
             let doc: TantivyDocument = searcher.doc(addr)?;
-            let label   = get_text(&doc, self.s.label);
-            let path    = get_text(&doc, self.s.path);
+            let label = get_text(&doc, self.s.label);
+            let path = get_text(&doc, self.s.path);
             let sortkey = get_text(&doc, self.s.sortkey);
-            let prio    = doc.get_first(self.s.prio)
+            let prio = doc
+                .get_first(self.s.prio)
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0);
-            results.push(FulltextResult { label, path, sortkey, prio, highlight: None });
+            results.push(FulltextResult {
+                label,
+                path,
+                sortkey,
+                prio,
+                highlight: None,
+            });
         }
 
         // Sort by (sortkey, prio) – matches Python behaviour
@@ -339,8 +355,12 @@ mod tests {
     fn test_basic_search() {
         let dir = tempdir().unwrap();
         let mut maker = build_index(dir.path());
-        maker.add_item("hm", "apple", "", "Apple", "/fs/apple", 0, "apple").unwrap();
-        maker.add_item("hm", "banana", "", "Banana", "/fs/banana", 0, "banana").unwrap();
+        maker
+            .add_item("hm", "apple", "", "Apple", "/fs/apple", 0, "apple")
+            .unwrap();
+        maker
+            .add_item("hm", "banana", "", "Banana", "/fs/banana", 0, "banana")
+            .unwrap();
         maker.commit().unwrap();
 
         let searcher = FulltextSearcher::open(dir.path()).unwrap();
@@ -353,8 +373,12 @@ mod tests {
     fn test_itemtype_filter() {
         let dir = tempdir().unwrap();
         let mut maker = build_index(dir.path());
-        maker.add_item("hm", "run",  "", "run (verb)", "/fs/run_v",  0, "run").unwrap();
-        maker.add_item("e",  "run fast", "", "example of run", "/fs/e1", 1, "run").unwrap();
+        maker
+            .add_item("hm", "run", "", "run (verb)", "/fs/run_v", 0, "run")
+            .unwrap();
+        maker
+            .add_item("e", "run fast", "", "example of run", "/fs/e1", 1, "run")
+            .unwrap();
         maker.commit().unwrap();
 
         let searcher = FulltextSearcher::open(dir.path()).unwrap();
@@ -367,7 +391,17 @@ mod tests {
     fn test_no_results() {
         let dir = tempdir().unwrap();
         let mut maker = build_index(dir.path());
-        maker.add_item("hm", "elephant", "", "Elephant", "/fs/elephant", 0, "elephant").unwrap();
+        maker
+            .add_item(
+                "hm",
+                "elephant",
+                "",
+                "Elephant",
+                "/fs/elephant",
+                0,
+                "elephant",
+            )
+            .unwrap();
         maker.commit().unwrap();
 
         let searcher = FulltextSearcher::open(dir.path()).unwrap();
@@ -380,9 +414,17 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut maker = build_index(dir.path());
         for i in 0..20u32 {
-            maker.add_item(
-                "hm", &format!("word{i}"), "", &format!("Word{i}"), &format!("/fs/w{i}"), i as u64, &format!("word{i}"),
-            ).unwrap();
+            maker
+                .add_item(
+                    "hm",
+                    &format!("word{i}"),
+                    "",
+                    &format!("Word{i}"),
+                    &format!("/fs/w{i}"),
+                    i as u64,
+                    &format!("word{i}"),
+                )
+                .unwrap();
         }
         maker.commit().unwrap();
 
@@ -395,9 +437,23 @@ mod tests {
     fn test_sort_order() {
         let dir = tempdir().unwrap();
         let mut maker = build_index(dir.path());
-        maker.add_item("hm", "zoo",   "", "Zoo",   "/fs/zoo",   0, "zoo").unwrap();
-        maker.add_item("hm", "aardvark", "", "Aardvark", "/fs/aardvark", 0, "aardvark").unwrap();
-        maker.add_item("hm", "middle", "", "Middle", "/fs/middle", 0, "middle").unwrap();
+        maker
+            .add_item("hm", "zoo", "", "Zoo", "/fs/zoo", 0, "zoo")
+            .unwrap();
+        maker
+            .add_item(
+                "hm",
+                "aardvark",
+                "",
+                "Aardvark",
+                "/fs/aardvark",
+                0,
+                "aardvark",
+            )
+            .unwrap();
+        maker
+            .add_item("hm", "middle", "", "Middle", "/fs/middle", 0, "middle")
+            .unwrap();
         maker.commit().unwrap();
 
         let searcher = FulltextSearcher::open(dir.path()).unwrap();
@@ -405,7 +461,12 @@ mod tests {
         let results = searcher.search(None, &[], None, None).unwrap();
         // Results must be sorted by sortkey
         for w in results.windows(2) {
-            assert!(w[0].sortkey <= w[1].sortkey, "not sorted: {:?} > {:?}", w[0].sortkey, w[1].sortkey);
+            assert!(
+                w[0].sortkey <= w[1].sortkey,
+                "not sorted: {:?} > {:?}",
+                w[0].sortkey,
+                w[1].sortkey
+            );
         }
     }
 

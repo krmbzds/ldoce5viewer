@@ -16,8 +16,7 @@ pub struct SearchPane<'a> {
 
 impl<'a> Widget for SearchPane<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let is_active = self.app.mode == AppMode::Searching
-            || self.app.mode == AppMode::Normal;
+        let is_active = self.app.mode == AppMode::Searching || self.app.mode == AppMode::Normal;
 
         let border_style = if self.app.mode == AppMode::Searching {
             Style::default().fg(Color::Cyan)
@@ -28,7 +27,10 @@ impl<'a> Widget for SearchPane<'a> {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(border_style)
-            .title(Span::styled(" Search ", Style::default().add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                " Search ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -50,11 +52,7 @@ impl<'a> Widget for SearchPane<'a> {
             0
         };
 
-        let visible: String = text
-            .chars()
-            .skip(start_char)
-            .take(display_width)
-            .collect();
+        let visible: String = text.chars().skip(start_char).take(display_width).collect();
 
         let cursor_in_view = cursor_pos - start_char;
 
@@ -64,10 +62,7 @@ impl<'a> Widget for SearchPane<'a> {
             .nth(cursor_in_view)
             .map(|c| c.to_string())
             .unwrap_or_else(|| " ".to_owned());
-        let after: String = visible
-            .chars()
-            .skip(cursor_in_view + 1)
-            .collect();
+        let after: String = visible.chars().skip(cursor_in_view + 1).collect();
 
         let cursor_style = if self.app.mode == AppMode::Searching {
             Style::default()
@@ -93,7 +88,12 @@ impl<'a> Widget for SearchPane<'a> {
             let suggestions = self.app.spell_suggestions.join("  ·  ");
             let suggestion_line = Line::from(vec![
                 Span::styled("Did you mean: ", Style::default().fg(Color::Yellow)),
-                Span::styled(suggestions, Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
+                Span::styled(
+                    suggestions,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::ITALIC),
+                ),
             ]);
             let suggest_area = Rect {
                 x: inner.x,

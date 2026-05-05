@@ -20,10 +20,10 @@ fn make_app() -> App {
 
 fn make_result(path: &str, sortkey: &str) -> SearchResultItem {
     SearchResultItem {
-        label:   path.to_owned(),
-        path:    path.to_owned(),
+        label: path.to_owned(),
+        path: path.to_owned(),
         sortkey: sortkey.to_owned(),
-        prio:    0,
+        prio: 0,
         snippet: None,
     }
 }
@@ -46,7 +46,9 @@ fn test_initial_mode_is_searching() {
 fn test_insert_chars() {
     let mut app = make_app();
     app.set_search_text("");
-    for ch in "hello".chars() { app.insert_char(ch); }
+    for ch in "hello".chars() {
+        app.insert_char(ch);
+    }
     assert_eq!(app.search_text, "hello");
     assert_eq!(app.search_cursor, 5);
 }
@@ -105,7 +107,11 @@ fn test_select_next_from_empty() {
 #[test]
 fn test_select_next_increments() {
     let mut app = make_app();
-    app.results = vec![make_result("/a", "a"), make_result("/b", "b"), make_result("/c", "c")];
+    app.results = vec![
+        make_result("/a", "a"),
+        make_result("/b", "b"),
+        make_result("/c", "c"),
+    ];
     app.select_next();
     app.select_next();
     assert_eq!(app.selected_row, Some(1));
@@ -153,9 +159,13 @@ fn test_zoom_in_out_reset() {
 #[test]
 fn test_zoom_clamped() {
     let mut app = make_app();
-    for _ in 0..50 { app.zoom_in(); }
+    for _ in 0..50 {
+        app.zoom_in();
+    }
     assert_eq!(app.zoom_power, 20);
-    for _ in 0..50 { app.zoom_out(); }
+    for _ in 0..50 {
+        app.zoom_out();
+    }
     assert_eq!(app.zoom_power, -10);
 }
 
@@ -185,7 +195,10 @@ fn test_history_push_clears_forward() {
     h.push("/b", "b");
     h.go_back(); // now at /a
     h.push("/c", "c"); // discard /b
-    assert!(!h.can_go_forward(), "forward history should be cleared after new push");
+    assert!(
+        !h.can_go_forward(),
+        "forward history should be cleared after new push"
+    );
 }
 
 #[test]
@@ -205,7 +218,7 @@ fn test_rebuild_results_dedup() {
     let mut app = make_app();
     let r = make_result("/a", "a");
     app.incr_results = vec![r.clone()];
-    app.fts_results  = vec![r.clone(), make_result("/b", "b")];
+    app.fts_results = vec![r.clone(), make_result("/b", "b")];
     app.rebuild_results();
     assert_eq!(app.results.len(), 2);
 }
@@ -218,9 +231,18 @@ fn test_rebuild_results_dedup() {
 fn test_find_in_page_matches() {
     let mut app = make_app();
     app.content_page = Some(vec![
-        Block { indent: 0, inlines: vec![Inline::Text("hello world".into(), Style::default())] },
-        Block { indent: 0, inlines: vec![Inline::Text("foo bar".into(), Style::default())] },
-        Block { indent: 0, inlines: vec![Inline::Text("hello again".into(), Style::default())] },
+        Block {
+            indent: 0,
+            inlines: vec![Inline::Text("hello world".into(), Style::default())],
+        },
+        Block {
+            indent: 0,
+            inlines: vec![Inline::Text("foo bar".into(), Style::default())],
+        },
+        Block {
+            indent: 0,
+            inlines: vec![Inline::Text("hello again".into(), Style::default())],
+        },
     ]);
     app.find_in_page("hello");
     assert_eq!(app.find_matches, vec![0, 2], "two blocks contain 'hello'");
@@ -230,8 +252,14 @@ fn test_find_in_page_matches() {
 fn test_find_next_wraps() {
     let mut app = make_app();
     app.content_page = Some(vec![
-        Block { indent: 0, inlines: vec![Inline::Text("a".into(), Style::default())] },
-        Block { indent: 0, inlines: vec![Inline::Text("a".into(), Style::default())] },
+        Block {
+            indent: 0,
+            inlines: vec![Inline::Text("a".into(), Style::default())],
+        },
+        Block {
+            indent: 0,
+            inlines: vec![Inline::Text("a".into(), Style::default())],
+        },
     ]);
     app.find_in_page("a");
     assert_eq!(app.find_matches.len(), 2);
@@ -297,8 +325,9 @@ fn test_anki_export_info_none_when_no_content() {
 #[test]
 fn test_anki_export_info_returns_something_when_content_present() {
     let mut app = make_app();
-    app.content_page = Some(vec![
-        Block { indent: 0, inlines: vec![Inline::Text("able".into(), Style::default())] },
-    ]);
+    app.content_page = Some(vec![Block {
+        indent: 0,
+        inlines: vec![Inline::Text("able".into(), Style::default())],
+    }]);
     assert!(app.anki_export_info().is_some());
 }

@@ -19,16 +19,24 @@ use crate::app::{App, AppMode};
 
 #[derive(Debug, Clone)]
 pub struct AppLayout {
-    pub search:  Rect,
+    pub search: Rect,
     pub results: Rect,
     pub content: Rect,
     pub findbar: Option<Rect>,
-    pub status:  Rect,
+    pub status: Rect,
 }
 
 pub fn compute_layout(area: Rect, app: &App) -> AppLayout {
-    let find_height: u16 = if app.mode == AppMode::FindInPage { 3 } else { 0 };
-    let search_height: u16 = if app.spell_suggestions.is_empty() { 3 } else { 4 };
+    let find_height: u16 = if app.mode == AppMode::FindInPage {
+        3
+    } else {
+        0
+    };
+    let search_height: u16 = if app.spell_suggestions.is_empty() {
+        3
+    } else {
+        4
+    };
 
     // Vertical split: [search | main | findbar | status]
     let v_constraints = if find_height > 0 {
@@ -55,10 +63,7 @@ pub fn compute_layout(area: Rect, app: &App) -> AppLayout {
     let result_width = (area.width / 3).max(20).min(50);
     let h_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(result_width),
-            Constraint::Min(30),
-        ])
+        .constraints([Constraint::Length(result_width), Constraint::Min(30)])
         .split(v_chunks[1]);
 
     let (findbar, status) = if find_height > 0 {
@@ -68,7 +73,7 @@ pub fn compute_layout(area: Rect, app: &App) -> AppLayout {
     };
 
     AppLayout {
-        search:  v_chunks[0],
+        search: v_chunks[0],
         results: h_chunks[0],
         content: h_chunks[1],
         findbar,

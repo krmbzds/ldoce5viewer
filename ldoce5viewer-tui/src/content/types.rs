@@ -36,19 +36,19 @@ pub enum ContentType {
 impl fmt::Display for ContentType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            ContentType::Entry              => "entry",
-            ContentType::Thesaurus          => "thesaurus",
-            ContentType::Collocations       => "collocations",
-            ContentType::WordSets           => "word_sets",
-            ContentType::Phrases            => "phrases",
-            ContentType::Examples           => "examples",
-            ContentType::WordFamilies       => "word_families",
-            ContentType::Etymologies        => "etymologies",
-            ContentType::Activator          => "activator",
-            ContentType::SearchResults      => "search",
+            ContentType::Entry => "entry",
+            ContentType::Thesaurus => "thesaurus",
+            ContentType::Collocations => "collocations",
+            ContentType::WordSets => "word_sets",
+            ContentType::Phrases => "phrases",
+            ContentType::Examples => "examples",
+            ContentType::WordFamilies => "word_families",
+            ContentType::Etymologies => "etymologies",
+            ContentType::Activator => "activator",
+            ContentType::SearchResults => "search",
             ContentType::AudioPronunciation => "audio",
-            ContentType::Picture            => "picture",
-            ContentType::Sound              => "sound",
+            ContentType::Picture => "picture",
+            ContentType::Sound => "sound",
         };
         write!(f, "{s}")
     }
@@ -65,14 +65,18 @@ impl fmt::Display for ContentType {
 pub struct ContentId {
     pub content_type: ContentType,
     /// The resource identifier (archive-relative key / filename)
-    pub id:           String,
+    pub id: String,
     /// Optional anchor within the page
-    pub anchor:       Option<String>,
+    pub anchor: Option<String>,
 }
 
 impl ContentId {
     pub fn new(ct: ContentType, id: &str) -> Self {
-        ContentId { content_type: ct, id: id.to_owned(), anchor: None }
+        ContentId {
+            content_type: ct,
+            id: id.to_owned(),
+            anchor: None,
+        }
     }
 
     pub fn with_anchor(mut self, anchor: &str) -> Self {
@@ -88,26 +92,28 @@ impl ContentId {
         let (archive, rest) = path.split_once('/')?;
         let (key, anchor) = match rest.split_once('#') {
             Some((k, a)) => (k, Some(a.to_owned())),
-            None         => (rest, None),
+            None => (rest, None),
         };
         let ct = match archive {
-            "fs"                   => ContentType::Entry,
-            "thesaurus"            => ContentType::Thesaurus,
-            "collocations"         => ContentType::Collocations,
-            "word_sets"            => ContentType::WordSets,
-            "phrases"              => ContentType::Phrases,
-            "examples"             => ContentType::Examples,
-            "word_families"        => ContentType::WordFamilies,
-            "etymologies"          => ContentType::Etymologies,
-            "activator"            => ContentType::Activator,
-            "gb_hwd_pron"
-            | "us_hwd_pron"
-            | "exa_pron"           => ContentType::AudioPronunciation,
-            "picture"              => ContentType::Picture,
-            "sound" | "sfx"        => ContentType::Sound,
-            _                      => return None,
+            "fs" => ContentType::Entry,
+            "thesaurus" => ContentType::Thesaurus,
+            "collocations" => ContentType::Collocations,
+            "word_sets" => ContentType::WordSets,
+            "phrases" => ContentType::Phrases,
+            "examples" => ContentType::Examples,
+            "word_families" => ContentType::WordFamilies,
+            "etymologies" => ContentType::Etymologies,
+            "activator" => ContentType::Activator,
+            "gb_hwd_pron" | "us_hwd_pron" | "exa_pron" => ContentType::AudioPronunciation,
+            "picture" => ContentType::Picture,
+            "sound" | "sfx" => ContentType::Sound,
+            _ => return None,
         };
-        Some(ContentId { content_type: ct, id: key.to_owned(), anchor })
+        Some(ContentId {
+            content_type: ct,
+            id: key.to_owned(),
+            anchor,
+        })
     }
 }
 
@@ -115,13 +121,13 @@ impl ContentId {
 #[derive(Debug, Clone)]
 pub struct SearchResultItem {
     /// Display label (may contain lightweight markup tags)
-    pub label:   String,
+    pub label: String,
     /// dict:// path, e.g. `/fs/3.4.6.2`
-    pub path:    String,
+    pub path: String,
     /// Normalised sort key
     pub sortkey: String,
     /// Priority (lower = higher priority in display)
-    pub prio:    u8,
+    pub prio: u8,
     /// Optional highlighted snippet (from full-text search)
     pub snippet: Option<String>,
 }
@@ -163,8 +169,8 @@ mod tests {
 
     #[test]
     fn test_content_type_display() {
-        assert_eq!(ContentType::Entry.to_string(),       "entry");
-        assert_eq!(ContentType::Thesaurus.to_string(),   "thesaurus");
-        assert_eq!(ContentType::Activator.to_string(),   "activator");
+        assert_eq!(ContentType::Entry.to_string(), "entry");
+        assert_eq!(ContentType::Thesaurus.to_string(), "thesaurus");
+        assert_eq!(ContentType::Activator.to_string(), "activator");
     }
 }

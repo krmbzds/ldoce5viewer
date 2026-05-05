@@ -36,29 +36,29 @@ use thiserror::Error;
 // --------------------------------------------------------------------------
 
 pub static ARCHIVE_DIRS: &[(&str, &str)] = &[
-    ("etymologies",        "etymologies.skn"),
-    ("word_families",      "word_families.skn"),
-    ("examples",           "examples.skn"),
-    ("sound",              "sound.skn"),
-    ("fs",                 "fs.skn"),
-    ("us_hwd_pron",        "us_hwd_pron.skn"),
-    ("gb_hwd_pron",        "gb_hwd_pron.skn"),
-    ("picture",            "picture.skn"),
-    ("phrases",            "phrases.skn"),
-    ("sfx",                "sfx.skn"),
-    ("thesaurus",          "thesaurus.skn"),
-    ("gram",               "gram.skn"),
-    ("collocations",       "collocations.skn"),
-    ("exa_pron",           "exa_pron.skn"),
-    ("common_errors",      "common_errors.skn"),
-    ("word_sets",          "word_sets.skn"),
-    ("menus",              "menus.skn"),
-    ("word_lists",         "word_lists.skn"),
-    ("verb_forms",         "verb_forms.skn"),
-    ("activator",          "activator.skn"),
+    ("etymologies", "etymologies.skn"),
+    ("word_families", "word_families.skn"),
+    ("examples", "examples.skn"),
+    ("sound", "sound.skn"),
+    ("fs", "fs.skn"),
+    ("us_hwd_pron", "us_hwd_pron.skn"),
+    ("gb_hwd_pron", "gb_hwd_pron.skn"),
+    ("picture", "picture.skn"),
+    ("phrases", "phrases.skn"),
+    ("sfx", "sfx.skn"),
+    ("thesaurus", "thesaurus.skn"),
+    ("gram", "gram.skn"),
+    ("collocations", "collocations.skn"),
+    ("exa_pron", "exa_pron.skn"),
+    ("common_errors", "common_errors.skn"),
+    ("word_sets", "word_sets.skn"),
+    ("menus", "menus.skn"),
+    ("word_lists", "word_lists.skn"),
+    ("verb_forms", "verb_forms.skn"),
+    ("activator", "activator.skn"),
     // Sub-archives within activator
-    ("activator_section",  "activator.skn/activator_section.skn"),
-    ("activator_concept",  "activator.skn/activator_concept.skn"),
+    ("activator_section", "activator.skn/activator_section.skn"),
+    ("activator_concept", "activator.skn/activator_concept.skn"),
 ];
 
 // --------------------------------------------------------------------------
@@ -83,11 +83,11 @@ pub enum ArchiveError {
 
 fn field_type_size(t: &str) -> Option<usize> {
     match t.trim() {
-        "UBYTE"  => Some(1),
+        "UBYTE" => Some(1),
         "USHORT" => Some(2),
-        "U24"    => Some(3),
-        "ULONG"  => Some(4),
-        _        => None,
+        "U24" => Some(3),
+        "ULONG" => Some(4),
+        _ => None,
     }
 }
 
@@ -143,9 +143,11 @@ fn read_int(data: &[u8], start: usize, size: usize) -> usize {
 // --------------------------------------------------------------------------
 
 /// Returns `(name, parent_idx)` for each directory in `dirs.skn/`.
-fn load_dir_list(base: &Path, fields: &HashMap<String, (usize, usize)>, rsize: usize)
-    -> Result<Vec<(String, usize)>, ArchiveError>
-{
+fn load_dir_list(
+    base: &Path,
+    fields: &HashMap<String, (usize, usize)>,
+    rsize: usize,
+) -> Result<Vec<(String, usize)>, ArchiveError> {
     let dirs_base = base.join("dirs.skn");
     // Names
     let name_bytes = fs::read(dirs_base.join("NAME.tda"))?;
@@ -208,9 +210,7 @@ pub struct FileEntry {
 }
 
 /// List all files in an archive, yielding `FileEntry` items.
-pub fn list_files(data_root: &Path, archive_name: &str)
-    -> Result<Vec<FileEntry>, ArchiveError>
-{
+pub fn list_files(data_root: &Path, archive_name: &str) -> Result<Vec<FileEntry>, ArchiveError> {
     let rel = ARCHIVE_DIRS
         .iter()
         .find(|&&(n, _)| n == archive_name)
@@ -267,7 +267,7 @@ pub fn list_files(data_root: &Path, archive_name: &str)
     for i in 0..num_chunks {
         let p = i * 8;
         let orig_sz = u32::from_le_bytes(tdz_bytes[p..p + 4].try_into().unwrap()) as u64;
-        let cmp_sz  = u32::from_le_bytes(tdz_bytes[p + 4..p + 8].try_into().unwrap()) as u64;
+        let cmp_sz = u32::from_le_bytes(tdz_bytes[p + 4..p + 8].try_into().unwrap()) as u64;
         orig_sizes.push(orig_sz);
         cmp_sizes.push(cmp_sz);
         orig_offsets.push(orig_offsets.last().unwrap() + orig_sz);
@@ -294,8 +294,8 @@ pub fn list_files(data_root: &Path, archive_name: &str)
         while ci + 1 < num_chunks && file_offset >= orig_offsets[ci + 1] {
             ci += 1;
         }
-        let cmp_offset  = cmp_offsets[ci];
-        let cmp_size    = cmp_sizes[ci];
+        let cmp_offset = cmp_offsets[ci];
+        let cmp_size = cmp_sizes[ci];
         let orig_offset_in_chunk = file_offset - orig_offsets[ci];
 
         let raw_size = if sizes[i] < 0 {
@@ -308,7 +308,11 @@ pub fn list_files(data_root: &Path, archive_name: &str)
         let dir_path = build_dir_path(&dirs, parents[i]);
         let name = file_names.get(i).cloned().unwrap_or_default();
 
-        entries.push(FileEntry { dir_path, name, location });
+        entries.push(FileEntry {
+            dir_path,
+            name,
+            location,
+        });
     }
 
     Ok(entries)
@@ -333,15 +337,15 @@ impl ArchiveReader {
             .map(|&(_, rel)| rel)
             .ok_or_else(|| ArchiveError::UnknownArchive(archive_name.to_owned()))?;
 
-        let content_path = data_dir
-            .join(rel)
-            .join("files.skn")
-            .join("CONTENT.tda");
+        let content_path = data_dir.join(rel).join("files.skn").join("CONTENT.tda");
 
         if !content_path.exists() {
             return Err(ArchiveError::InvalidDataDir);
         }
-        Ok(ArchiveReader { content_path, cache: None })
+        Ok(ArchiveReader {
+            content_path,
+            cache: None,
+        })
     }
 
     /// Read the decompressed content of a file given its `location`.

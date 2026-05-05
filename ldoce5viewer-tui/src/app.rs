@@ -39,20 +39,24 @@ pub enum AppMode {
 
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
-    pub path:  String,
+    pub path: String,
     pub query: String,
 }
 
 pub struct NavHistory {
     pub entries: VecDeque<HistoryEntry>,
-    pub cursor:  usize,
+    pub cursor: usize,
     /// Maximum number of entries to keep.
-    max:     usize,
+    max: usize,
 }
 
 impl NavHistory {
     pub fn new() -> Self {
-        NavHistory { entries: VecDeque::new(), cursor: 0, max: 50 }
+        NavHistory {
+            entries: VecDeque::new(),
+            cursor: 0,
+            max: 50,
+        }
     }
 
     /// Push a new entry, discarding any forward history.
@@ -69,14 +73,23 @@ impl NavHistory {
         }
         if self.entries.len() >= self.max {
             self.entries.pop_front();
-            if self.cursor > 0 { self.cursor -= 1; }
+            if self.cursor > 0 {
+                self.cursor -= 1;
+            }
         }
-        self.entries.push_back(HistoryEntry { path: path.to_owned(), query: query.to_owned() });
+        self.entries.push_back(HistoryEntry {
+            path: path.to_owned(),
+            query: query.to_owned(),
+        });
         self.cursor = self.entries.len() - 1;
     }
 
-    pub fn can_go_back(&self) -> bool    { self.cursor > 0 }
-    pub fn can_go_forward(&self) -> bool { self.cursor + 1 < self.entries.len() }
+    pub fn can_go_back(&self) -> bool {
+        self.cursor > 0
+    }
+    pub fn can_go_forward(&self) -> bool {
+        self.cursor + 1 < self.entries.len()
+    }
 
     pub fn go_back(&mut self) -> Option<&HistoryEntry> {
         if self.can_go_back() {
@@ -122,19 +135,19 @@ impl NavHistory {
 
 #[derive(Debug, Clone)]
 pub struct FilterNode {
-    pub label:    String,
-    pub code:     Option<String>,
+    pub label: String,
+    pub code: Option<String>,
     pub children: Vec<FilterNode>,
-    pub checked:  bool,
+    pub checked: bool,
 }
 
 impl FilterNode {
     fn new(label: &str, code: Option<&str>) -> Self {
         FilterNode {
-            label:    label.to_owned(),
-            code:     code.map(str::to_owned),
+            label: label.to_owned(),
+            code: code.map(str::to_owned),
             children: Vec::new(),
-            checked:  false,
+            checked: false,
         }
     }
 
@@ -170,30 +183,30 @@ pub fn build_filter_tree() -> Vec<FilterNode> {
             FilterNode::new("3000", Some("238")),
         ]),
         FilterNode::new("Multimedia", None).with_children(vec![
-            FilterNode::new("Picture",      Some("332")),
+            FilterNode::new("Picture", Some("332")),
             FilterNode::new("Sound effect", Some("333")),
         ]),
         FilterNode::new("Part of speech", None).with_children(vec![
-            FilterNode::new("adjective",    Some("334")),
-            FilterNode::new("adverb",       Some("335")),
+            FilterNode::new("adjective", Some("334")),
+            FilterNode::new("adverb", Some("335")),
             FilterNode::new("auxiliary verb", Some("336")),
-            FilterNode::new("conjunction",  Some("337")),
-            FilterNode::new("determiner",   Some("338")),
+            FilterNode::new("conjunction", Some("337")),
+            FilterNode::new("determiner", Some("338")),
             FilterNode::new("interjection", Some("339")),
-            FilterNode::new("modal verb",   Some("340")),
-            FilterNode::new("noun",         Some("341")),
-            FilterNode::new("number",       Some("342")),
+            FilterNode::new("modal verb", Some("340")),
+            FilterNode::new("noun", Some("341")),
+            FilterNode::new("number", Some("342")),
             FilterNode::new("phrasal verb", Some("343")),
-            FilterNode::new("preposition",  Some("346")),
-            FilterNode::new("verb",         Some("349")),
+            FilterNode::new("preposition", Some("346")),
+            FilterNode::new("verb", Some("349")),
         ]),
         FilterNode::new("Register", None).with_children(vec![
-            FilterNode::new("formal",       Some("351")),
-            FilterNode::new("informal",     Some("353")),
-            FilterNode::new("spoken",       Some("360")),
-            FilterNode::new("written",      Some("364")),
-            FilterNode::new("technical",    Some("362")),
-            FilterNode::new("old-fashioned",Some("359")),
+            FilterNode::new("formal", Some("351")),
+            FilterNode::new("informal", Some("353")),
+            FilterNode::new("spoken", Some("360")),
+            FilterNode::new("written", Some("364")),
+            FilterNode::new("technical", Some("362")),
+            FilterNode::new("old-fashioned", Some("359")),
         ]),
     ]
 }
@@ -204,7 +217,7 @@ pub fn build_filter_tree() -> Vec<FilterNode> {
 
 #[derive(Debug, Clone)]
 pub struct AnkiExportInfo {
-    pub header:  String,
+    pub header: String,
     pub meaning: String,
     pub audio_paths: Vec<String>,
 }
@@ -225,28 +238,28 @@ pub struct App {
     /// Results from incremental search.
     pub incr_results: Vec<SearchResultItem>,
     /// Results from full-text search.
-    pub fts_results:  Vec<SearchResultItem>,
+    pub fts_results: Vec<SearchResultItem>,
     /// Merged and deduplicated result list.
-    pub results:      Vec<SearchResultItem>,
+    pub results: Vec<SearchResultItem>,
     /// Currently highlighted row in the result list.
     pub selected_row: Option<usize>,
     /// How far the result list is scrolled.
     pub result_scroll: usize,
 
     // ── Find in page ──────────────────────────────────────────────────────
-    pub find_text:    String,
-    pub find_matches: Vec<usize>,  // line indices of matches
-    pub find_cursor:  usize,
+    pub find_text: String,
+    pub find_matches: Vec<usize>, // line indices of matches
+    pub find_cursor: usize,
 
     // ── Content view ──────────────────────────────────────────────────────
-    pub content_page:   Option<ContentPage>,
+    pub content_page: Option<ContentPage>,
     pub content_scroll: usize,
     /// Horizontal scroll offset in the content view (columns, used when wrap is off).
     pub content_scroll_x: u16,
     /// The currently displayed content path.
-    pub current_path:   Option<String>,
+    pub current_path: Option<String>,
     /// Audio buttons in the current page: (block_idx, col_start, path, title).
-    pub audio_buttons:  Vec<(usize, u16, String, String)>,
+    pub audio_buttons: Vec<(usize, u16, String, String)>,
 
     // ── Zoom ──────────────────────────────────────────────────────────────
     /// Zoom level: each integer step multiplies the font size by 1.05.
@@ -256,7 +269,7 @@ pub struct App {
     pub history: NavHistory,
 
     // ── Advanced search ───────────────────────────────────────────────────
-    pub adv_phrase:      String,
+    pub adv_phrase: String,
     pub adv_filter_tree: Vec<FilterNode>,
     /// Focused node index in the advanced search tree.
     pub adv_tree_cursor: usize,
@@ -276,8 +289,8 @@ pub struct App {
 
     // ── Searchers (lazy-loaded) ───────────────────────────────────────────
     pub incr_searcher: Option<IncrementalSearcher>,
-    pub fts_hp:        Option<FulltextSearcher>,
-    pub fts_de:        Option<FulltextSearcher>,
+    pub fts_hp: Option<FulltextSearcher>,
+    pub fts_de: Option<FulltextSearcher>,
 
     // ── Audio ─────────────────────────────────────────────────────────────
     pub audio_player: Option<AudioPlayer>,
@@ -289,37 +302,37 @@ pub struct App {
 impl App {
     pub fn new(config: Config) -> Self {
         App {
-            mode:             AppMode::Searching,
-            search_text:      config.last_query.clone(),
-            search_cursor:    config.last_query.len(),
-            incr_results:     Vec::new(),
-            fts_results:      Vec::new(),
-            results:          Vec::new(),
-            selected_row:     None,
-            result_scroll:    0,
-            find_text:        String::new(),
-            find_matches:     Vec::new(),
-            find_cursor:      0,
-            content_page:     None,
-            content_scroll:   0,
+            mode: AppMode::Searching,
+            search_text: config.last_query.clone(),
+            search_cursor: config.last_query.len(),
+            incr_results: Vec::new(),
+            fts_results: Vec::new(),
+            results: Vec::new(),
+            selected_row: None,
+            result_scroll: 0,
+            find_text: String::new(),
+            find_matches: Vec::new(),
+            find_cursor: 0,
+            content_page: None,
+            content_scroll: 0,
             content_scroll_x: 0,
-            current_path:     None,
-            audio_buttons:    Vec::new(),
-            zoom_power:       0,
-            history:          NavHistory::new(),
-            adv_phrase:       String::new(),
-            adv_filter_tree:  build_filter_tree(),
-            adv_tree_cursor:  0,
-            clipboard_text:   String::new(),
-            status:           String::new(),
-            is_searching:     false,
-            spell_suggestions:Vec::new(),
+            current_path: None,
+            audio_buttons: Vec::new(),
+            zoom_power: 0,
+            history: NavHistory::new(),
+            adv_phrase: String::new(),
+            adv_filter_tree: build_filter_tree(),
+            adv_tree_cursor: 0,
+            clipboard_text: String::new(),
+            status: String::new(),
+            is_searching: false,
+            spell_suggestions: Vec::new(),
             config,
-            incr_searcher:    None,
-            fts_hp:           None,
-            fts_de:           None,
-            audio_player:     AudioPlayer::new().ok(),
-            auto_pron_pending:None,
+            incr_searcher: None,
+            fts_hp: None,
+            fts_de: None,
+            audio_player: AudioPlayer::new().ok(),
+            auto_pron_pending: None,
         }
     }
 
@@ -336,11 +349,17 @@ impl App {
 
     /// Delete the character immediately before the cursor.
     pub fn backspace(&mut self) {
-        if self.search_cursor == 0 { return; }
+        if self.search_cursor == 0 {
+            return;
+        }
         let mut s = std::mem::take(&mut self.search_text);
         let byte_pos = char_to_byte_pos(&s, self.search_cursor);
         // Find the byte position of the previous char
-        let prev = s[..byte_pos].char_indices().last().map(|(i, _)| i).unwrap_or(0);
+        let prev = s[..byte_pos]
+            .char_indices()
+            .last()
+            .map(|(i, _)| i)
+            .unwrap_or(0);
         s.remove(prev);
         self.search_cursor -= 1;
         self.search_text = s;
@@ -354,17 +373,25 @@ impl App {
 
     /// Move search cursor left.
     pub fn cursor_left(&mut self) {
-        if self.search_cursor > 0 { self.search_cursor -= 1; }
+        if self.search_cursor > 0 {
+            self.search_cursor -= 1;
+        }
     }
 
     /// Move search cursor right.
     pub fn cursor_right(&mut self) {
         let len = self.search_text.chars().count();
-        if self.search_cursor < len { self.search_cursor += 1; }
+        if self.search_cursor < len {
+            self.search_cursor += 1;
+        }
     }
 
-    pub fn cursor_home(&mut self) { self.search_cursor = 0; }
-    pub fn cursor_end(&mut self)  { self.search_cursor = self.search_text.chars().count(); }
+    pub fn cursor_home(&mut self) {
+        self.search_cursor = 0;
+    }
+    pub fn cursor_end(&mut self) {
+        self.search_cursor = self.search_text.chars().count();
+    }
 
     // ── Result list navigation ───────────────────────────────────────────
 
@@ -374,11 +401,7 @@ impl App {
     }
 
     pub fn select_prev(&mut self) {
-        self.selected_row = Some(
-            self.selected_row
-                .map(|r| r.saturating_sub(1))
-                .unwrap_or(0),
-        );
+        self.selected_row = Some(self.selected_row.map(|r| r.saturating_sub(1)).unwrap_or(0));
     }
 
     /// Select the first result whose plain field starts with `prefix`.
@@ -400,10 +423,7 @@ impl App {
 
     pub fn rebuild_results(&mut self) {
         use std::collections::HashSet;
-        let mut seen: HashSet<String> = self.incr_results
-            .iter()
-            .map(|r| r.path.clone())
-            .collect();
+        let mut seen: HashSet<String> = self.incr_results.iter().map(|r| r.path.clone()).collect();
         self.results = self.incr_results.clone();
         for r in &self.fts_results {
             if seen.insert(r.path.clone()) {
@@ -435,12 +455,17 @@ impl App {
                     match inline {
                         crate::content::Inline::AudioButton { path, title } => {
                             let emoji = match title.as_str() {
-                                "British"  => "🇬🇧",
+                                "British" => "🇬🇧",
                                 "American" => "🇺🇸",
-                                _          => "▶",
+                                _ => "▶",
                             };
                             let btn_width = 1 + emoji.chars().count() + 1; // " emoji "
-                            self.audio_buttons.push((block_idx, col as u16, path.clone(), title.clone()));
+                            self.audio_buttons.push((
+                                block_idx,
+                                col as u16,
+                                path.clone(),
+                                title.clone(),
+                            ));
                             col += btn_width;
                         }
                         crate::content::Inline::Text(t, _) => {
@@ -464,9 +489,13 @@ impl App {
 
     /// Play the audio button nearest to (or at) the given block index.
     pub fn play_nearest_audio(&mut self, near_block: usize) -> bool {
-        if self.audio_buttons.is_empty() { return false; }
+        if self.audio_buttons.is_empty() {
+            return false;
+        }
         // Find the closest audio button
-        let best = self.audio_buttons.iter()
+        let best = self
+            .audio_buttons
+            .iter()
             .min_by_key(|(idx, _, _, _)| (*idx as isize - near_block as isize).unsigned_abs())
             .cloned();
         if let Some((_, _, path, _)) = best {
@@ -506,7 +535,8 @@ impl App {
     // ── Content scroll ───────────────────────────────────────────────────
 
     pub fn scroll_down(&mut self, lines: usize) {
-        let max = self.content_page
+        let max = self
+            .content_page
             .as_ref()
             .map(|p| p.len().saturating_sub(1))
             .unwrap_or(0);
@@ -517,9 +547,12 @@ impl App {
         self.content_scroll = self.content_scroll.saturating_sub(lines);
     }
 
-    pub fn scroll_to_top(&mut self)    { self.content_scroll = 0; }
+    pub fn scroll_to_top(&mut self) {
+        self.content_scroll = 0;
+    }
     pub fn scroll_to_bottom(&mut self) {
-        self.content_scroll = self.content_page
+        self.content_scroll = self
+            .content_page
             .as_ref()
             .map(|p| p.len().saturating_sub(1))
             .unwrap_or(0);
@@ -543,9 +576,15 @@ impl App {
 
     // ── Zoom ─────────────────────────────────────────────────────────────
     // (zoom_power is kept for config compatibility but not actively used)
-    pub fn zoom_in(&mut self)  { self.zoom_power = (self.zoom_power + 1).min(20); }
-    pub fn zoom_out(&mut self) { self.zoom_power = (self.zoom_power - 1).max(-10); }
-    pub fn zoom_reset(&mut self) { self.zoom_power = 0; }
+    pub fn zoom_in(&mut self) {
+        self.zoom_power = (self.zoom_power + 1).min(20);
+    }
+    pub fn zoom_out(&mut self) {
+        self.zoom_power = (self.zoom_power - 1).max(-10);
+    }
+    pub fn zoom_reset(&mut self) {
+        self.zoom_power = 0;
+    }
 
     /// Returns the effective zoom factor (1.05^zoom_power).
     pub fn zoom_factor(&self) -> f32 {
@@ -568,13 +607,11 @@ impl App {
                 let text: String = block
                     .inlines
                     .iter()
-                    .filter_map(|il| {
-                            match il {
-                                crate::content::Inline::Text(t, _) => Some(t.as_str()),
-                                crate::content::Inline::Headword(t) => Some(t.as_str()),
-                                _ => None,
-                            }
-                        })
+                    .filter_map(|il| match il {
+                        crate::content::Inline::Text(t, _) => Some(t.as_str()),
+                        crate::content::Inline::Headword(t) => Some(t.as_str()),
+                        _ => None,
+                    })
                     .collect::<Vec<_>>()
                     .join("");
                 if text.to_lowercase().contains(&q) {
@@ -588,13 +625,17 @@ impl App {
     }
 
     pub fn find_next(&mut self) {
-        if self.find_matches.is_empty() { return; }
+        if self.find_matches.is_empty() {
+            return;
+        }
         self.find_cursor = (self.find_cursor + 1) % self.find_matches.len();
         self.content_scroll = self.find_matches[self.find_cursor];
     }
 
     pub fn find_prev(&mut self) {
-        if self.find_matches.is_empty() { return; }
+        if self.find_matches.is_empty() {
+            return;
+        }
         if self.find_cursor == 0 {
             self.find_cursor = self.find_matches.len() - 1;
         } else {
@@ -631,8 +672,11 @@ impl App {
             for inline in &block.inlines {
                 match inline {
                     crate::content::Inline::Text(t, _) | crate::content::Inline::Headword(t) => {
-                        if header.is_empty() { header.push_str(t); }
-                        else { meaning.push_str(t); }
+                        if header.is_empty() {
+                            header.push_str(t);
+                        } else {
+                            meaning.push_str(t);
+                        }
                     }
                     crate::content::Inline::AudioButton { path, .. } => {
                         audio_paths.push(path.clone());
@@ -641,15 +685,23 @@ impl App {
                 }
             }
         }
-        Some(AnkiExportInfo { header, meaning, audio_paths })
+        Some(AnkiExportInfo {
+            header,
+            meaning,
+            audio_paths,
+        })
     }
 
     // ── Clipboard ────────────────────────────────────────────────────────
 
     pub fn handle_clipboard_change(&mut self, text: &str) {
-        if !self.config.monitor_clipboard { return; }
+        if !self.config.monitor_clipboard {
+            return;
+        }
         let trimmed = text.trim();
-        if trimmed.is_empty() || trimmed == self.clipboard_text { return; }
+        if trimmed.is_empty() || trimmed == self.clipboard_text {
+            return;
+        }
         self.clipboard_text = trimmed.to_owned();
         // Auto-search if the text looks like a word
         if trimmed.split_whitespace().count() <= 5 {
@@ -662,7 +714,9 @@ impl App {
     pub fn trigger_auto_pron(&mut self, path: String) {
         match &self.config.auto_pron {
             AutoPronLanguage::Off => {}
-            _ => { self.auto_pron_pending = Some(path); }
+            _ => {
+                self.auto_pron_pending = Some(path);
+            }
         }
     }
 
@@ -763,9 +817,27 @@ mod tests {
     fn test_select_next_prev() {
         let mut app = make_app();
         app.results = vec![
-            SearchResultItem { label: "a".into(), path: "/a".into(), sortkey: "a".into(), prio: 0, snippet: None },
-            SearchResultItem { label: "b".into(), path: "/b".into(), sortkey: "b".into(), prio: 0, snippet: None },
-            SearchResultItem { label: "c".into(), path: "/c".into(), sortkey: "c".into(), prio: 0, snippet: None },
+            SearchResultItem {
+                label: "a".into(),
+                path: "/a".into(),
+                sortkey: "a".into(),
+                prio: 0,
+                snippet: None,
+            },
+            SearchResultItem {
+                label: "b".into(),
+                path: "/b".into(),
+                sortkey: "b".into(),
+                prio: 0,
+                snippet: None,
+            },
+            SearchResultItem {
+                label: "c".into(),
+                path: "/c".into(),
+                sortkey: "c".into(),
+                prio: 0,
+                snippet: None,
+            },
         ];
         app.select_next();
         assert_eq!(app.selected_row, Some(0));
@@ -780,7 +852,7 @@ mod tests {
     #[test]
     fn test_nav_history() {
         let mut h = NavHistory::new();
-        h.push("/fs/apple",  "apple");
+        h.push("/fs/apple", "apple");
         h.push("/fs/banana", "banana");
         assert!(h.can_go_back());
         assert!(!h.can_go_forward());
@@ -826,9 +898,13 @@ mod tests {
     #[test]
     fn test_zoom_clamp() {
         let mut app = make_app();
-        for _ in 0..30 { app.zoom_in(); }
+        for _ in 0..30 {
+            app.zoom_in();
+        }
         assert_eq!(app.zoom_power, 20);
-        for _ in 0..30 { app.zoom_out(); }
+        for _ in 0..30 {
+            app.zoom_out();
+        }
         assert_eq!(app.zoom_power, -10);
     }
 
@@ -838,9 +914,18 @@ mod tests {
         use ratatui::style::Style;
         let mut app = make_app();
         app.content_page = Some(vec![
-            Block { indent: 0, inlines: vec![Inline::Text("hello world".into(), Style::default())] },
-            Block { indent: 0, inlines: vec![Inline::Text("foo bar".into(), Style::default())] },
-            Block { indent: 0, inlines: vec![Inline::Text("hello again".into(), Style::default())] },
+            Block {
+                indent: 0,
+                inlines: vec![Inline::Text("hello world".into(), Style::default())],
+            },
+            Block {
+                indent: 0,
+                inlines: vec![Inline::Text("foo bar".into(), Style::default())],
+            },
+            Block {
+                indent: 0,
+                inlines: vec![Inline::Text("hello again".into(), Style::default())],
+            },
         ]);
         app.find_in_page("hello");
         assert_eq!(app.find_matches, vec![0, 2]);
@@ -853,11 +938,23 @@ mod tests {
     #[test]
     fn test_rebuild_results_dedup() {
         let mut app = make_app();
-        let item_a = SearchResultItem { label: "A".into(), path: "/a".into(), sortkey: "a".into(), prio: 0, snippet: None };
-        let item_b = SearchResultItem { label: "B".into(), path: "/b".into(), sortkey: "b".into(), prio: 0, snippet: None };
+        let item_a = SearchResultItem {
+            label: "A".into(),
+            path: "/a".into(),
+            sortkey: "a".into(),
+            prio: 0,
+            snippet: None,
+        };
+        let item_b = SearchResultItem {
+            label: "B".into(),
+            path: "/b".into(),
+            sortkey: "b".into(),
+            prio: 0,
+            snippet: None,
+        };
         app.incr_results = vec![item_a.clone()];
         // item_a also appears in fts, item_b is new
-        app.fts_results  = vec![item_a.clone(), item_b.clone()];
+        app.fts_results = vec![item_a.clone(), item_b.clone()];
         app.rebuild_results();
         assert_eq!(app.results.len(), 2, "duplicates should be removed");
     }

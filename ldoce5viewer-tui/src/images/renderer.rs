@@ -123,7 +123,13 @@ pub fn render_kitty<W: Write>(
 
 /// Render `img` using viuer (handles both Kitty and Sixel depending on
 /// detected capability).
-pub fn render_with_viuer(img: &DynamicImage, x: u16, y: u16, width: u32, height: u32) -> Result<(), ImageError> {
+pub fn render_with_viuer(
+    img: &DynamicImage,
+    x: u16,
+    y: u16,
+    width: u32,
+    height: u32,
+) -> Result<(), ImageError> {
     let config = viuer::Config {
         absolute_offset: true,
         x,
@@ -230,6 +236,6 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         // Should start with the Kitty APC escape
         assert!(s.contains("\x1b_G"), "missing Kitty escape sequence");
-        assert!(s.contains("\x1b\\"),  "missing Kitty string terminator");
+        assert!(s.contains("\x1b\\"), "missing Kitty string terminator");
     }
 }

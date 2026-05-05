@@ -47,19 +47,35 @@ pub struct Block {
 
 impl Block {
     fn new(indent: u8) -> Self {
-        Block { indent, inlines: Vec::new() }
+        Block {
+            indent,
+            inlines: Vec::new(),
+        }
     }
 
     fn push_text(&mut self, text: &str, style: Style) {
-        if text.is_empty() { return; }
+        if text.is_empty() {
+            return;
+        }
         // If the last inline is text with the same style, append to it (inserting a
         // space when needed).
         if let Some(last) = self.inlines.last_mut() {
             if let Inline::Text(last_text, last_style) = last {
                 if *last_style == style {
-                    let need_space = last_text.chars().rev().next().map(|c| c.is_alphanumeric()).unwrap_or(false)
-                        && text.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false);
-                    if need_space { last_text.push(' '); }
+                    let need_space = last_text
+                        .chars()
+                        .rev()
+                        .next()
+                        .map(|c| c.is_alphanumeric())
+                        .unwrap_or(false)
+                        && text
+                            .chars()
+                            .next()
+                            .map(|c| c.is_alphanumeric())
+                            .unwrap_or(false);
+                    if need_space {
+                        last_text.push(' ');
+                    }
                     last_text.push_str(text);
                     return;
                 }
@@ -69,13 +85,26 @@ impl Block {
     }
 
     fn push_headword(&mut self, text: &str) {
-        if text.is_empty() { return; }
+        if text.is_empty() {
+            return;
+        }
         if let Some(last) = self.inlines.last_mut() {
             if let Inline::Headword(last_text) = last {
                 // choose to insert a space when joining two alphanumeric tokens
-                let need_space = last_text.chars().rev().next().map(|c| c.is_alphanumeric()).unwrap_or(false)
-                    && text.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false);
-                if need_space { last_text.push(' '); }
+                let need_space = last_text
+                    .chars()
+                    .rev()
+                    .next()
+                    .map(|c| c.is_alphanumeric())
+                    .unwrap_or(false)
+                    && text
+                        .chars()
+                        .next()
+                        .map(|c| c.is_alphanumeric())
+                        .unwrap_or(false);
+                if need_space {
+                    last_text.push(' ');
+                }
                 last_text.push_str(text);
                 return;
             }
@@ -91,16 +120,44 @@ pub type ContentPage = Vec<Block>;
 // Style constants
 // --------------------------------------------------------------------------
 
-fn style_default() -> Style { Style::default() }
-fn style_headword() -> Style { Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD) }
-fn style_pos()      -> Style { Style::default().fg(Color::Yellow) }
-fn style_def()      -> Style { Style::default() }
-fn style_example()  -> Style { Style::default().fg(Color::Green).add_modifier(Modifier::ITALIC) }
-fn style_ref()      -> Style { Style::default().fg(Color::Blue).add_modifier(Modifier::UNDERLINED) }
-fn style_label()    -> Style { Style::default().fg(Color::Magenta) }
-fn style_heading()  -> Style { Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::UNDERLINED) }
-fn style_audio()    -> Style { Style::default().fg(Color::Cyan) }
-fn style_dim()      -> Style { Style::default().add_modifier(Modifier::DIM) }
+fn style_default() -> Style {
+    Style::default()
+}
+fn style_headword() -> Style {
+    Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD)
+}
+fn style_pos() -> Style {
+    Style::default().fg(Color::Yellow)
+}
+fn style_def() -> Style {
+    Style::default()
+}
+fn style_example() -> Style {
+    Style::default()
+        .fg(Color::Green)
+        .add_modifier(Modifier::ITALIC)
+}
+fn style_ref() -> Style {
+    Style::default()
+        .fg(Color::Blue)
+        .add_modifier(Modifier::UNDERLINED)
+}
+fn style_label() -> Style {
+    Style::default().fg(Color::Magenta)
+}
+fn style_heading() -> Style {
+    Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+}
+fn style_audio() -> Style {
+    Style::default().fg(Color::Cyan)
+}
+fn style_dim() -> Style {
+    Style::default().add_modifier(Modifier::DIM)
+}
 
 // --------------------------------------------------------------------------
 // to_ratatui_text  (ContentPage → ratatui Text)
@@ -108,49 +165,52 @@ fn style_dim()      -> Style { Style::default().add_modifier(Modifier::DIM) }
 
 /// Convert a `ContentPage` into a ratatui `Text` object.
 pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
-    let lines: Vec<Line> = page.iter().flat_map(|block| {
-        // Expand LineBreak inlines into multiple lines
-        let mut current: Vec<Span> = Vec::new();
-        if block.indent > 0 {
-            current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
-        }
-        let mut result_lines: Vec<Line> = Vec::new();
+    let lines: Vec<Line> = page
+        .iter()
+        .flat_map(|block| {
+            // Expand LineBreak inlines into multiple lines
+            let mut current: Vec<Span> = Vec::new();
+            if block.indent > 0 {
+                current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
+            }
+            let mut result_lines: Vec<Line> = Vec::new();
 
-        for inline in &block.inlines {
-            match inline {
-                Inline::Text(text, style) => {
-                    current.push(Span::styled(text.clone(), *style));
-                }
-                Inline::Headword(text) => {
-                    current.push(Span::styled(text.clone(), style_headword()));
-                }
-                Inline::AudioButton { title, .. } => {
-                    let emoji = match title.as_str() {
-                        "British"  => "🇬🇧",
-                        "American" => "🇺🇸",
-                        _          => "▶",
-                    };
-                    current.push(Span::styled(format!(" {emoji} "), style_audio()));
-                }
-                Inline::Image { .. } => {
-                    // Images cannot be rendered in a TUI; skip silently.
-                }
-                Inline::Link { text, .. } => {
-                    current.push(Span::styled(text.clone(), style_ref()));
-                }
-                Inline::LineBreak => {
-                    result_lines.push(Line::from(std::mem::take(&mut current)));
-                    if block.indent > 0 {
-                        current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
+            for inline in &block.inlines {
+                match inline {
+                    Inline::Text(text, style) => {
+                        current.push(Span::styled(text.clone(), *style));
+                    }
+                    Inline::Headword(text) => {
+                        current.push(Span::styled(text.clone(), style_headword()));
+                    }
+                    Inline::AudioButton { title, .. } => {
+                        let emoji = match title.as_str() {
+                            "British" => "🇬🇧",
+                            "American" => "🇺🇸",
+                            _ => "▶",
+                        };
+                        current.push(Span::styled(format!(" {emoji} "), style_audio()));
+                    }
+                    Inline::Image { .. } => {
+                        // Images cannot be rendered in a TUI; skip silently.
+                    }
+                    Inline::Link { text, .. } => {
+                        current.push(Span::styled(text.clone(), style_ref()));
+                    }
+                    Inline::LineBreak => {
+                        result_lines.push(Line::from(std::mem::take(&mut current)));
+                        if block.indent > 0 {
+                            current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
+                        }
                     }
                 }
             }
-        }
-        if !current.is_empty() {
-            result_lines.push(Line::from(current));
-        }
-        result_lines
-    }).collect();
+            if !current.is_empty() {
+                result_lines.push(Line::from(current));
+            }
+            result_lines
+        })
+        .collect();
 
     Text::from(lines)
 }
@@ -167,9 +227,14 @@ struct XmlWalker<'a> {
 /// sequence of (tag, is_open, text, attrs) tuples for simple tree walking.
 #[derive(Debug)]
 enum XmlNode {
-    Open  { tag: String, attrs: Vec<(String, String)> },
-    Close { tag: String },
-    Text  (String),
+    Open {
+        tag: String,
+        attrs: Vec<(String, String)>,
+    },
+    Close {
+        tag: String,
+    },
+    Text(String),
 }
 
 fn parse_xml(xml: &[u8]) -> Vec<XmlNode> {
@@ -184,8 +249,12 @@ fn parse_xml(xml: &[u8]) -> Vec<XmlNode> {
                 let tag = String::from_utf8_lossy(e.local_name().into_inner()).into_owned();
                 let mut attrs = Vec::new();
                 for attr in e.attributes().flatten() {
-                    let key = String::from_utf8_lossy(attr.key.local_name().into_inner()).into_owned();
-                    let val = attr.unescape_value().map(|v| v.into_owned()).unwrap_or_default();
+                    let key =
+                        String::from_utf8_lossy(attr.key.local_name().into_inner()).into_owned();
+                    let val = attr
+                        .unescape_value()
+                        .map(|v| v.into_owned())
+                        .unwrap_or_default();
                     attrs.push((key, val));
                 }
                 nodes.push(XmlNode::Open { tag, attrs });
@@ -198,11 +267,18 @@ fn parse_xml(xml: &[u8]) -> Vec<XmlNode> {
                 let tag = String::from_utf8_lossy(e.local_name().into_inner()).into_owned();
                 let mut attrs = Vec::new();
                 for attr in e.attributes().flatten() {
-                    let key = String::from_utf8_lossy(attr.key.local_name().into_inner()).into_owned();
-                    let val = attr.unescape_value().map(|v| v.into_owned()).unwrap_or_default();
+                    let key =
+                        String::from_utf8_lossy(attr.key.local_name().into_inner()).into_owned();
+                    let val = attr
+                        .unescape_value()
+                        .map(|v| v.into_owned())
+                        .unwrap_or_default();
                     attrs.push((key, val));
                 }
-                nodes.push(XmlNode::Open  { tag: tag.clone(), attrs });
+                nodes.push(XmlNode::Open {
+                    tag: tag.clone(),
+                    attrs,
+                });
                 nodes.push(XmlNode::Close { tag });
             }
             Ok(Event::Text(e)) => {
@@ -241,7 +317,9 @@ fn strip_audio_markers(text: &str) -> std::borrow::Cow<str> {
             // Consume the optional [...] payload that follows
             if chars.peek() == Some(&'[') {
                 for c in chars.by_ref() {
-                    if c == ']' { break; }
+                    if c == ']' {
+                        break;
+                    }
                 }
             }
         } else {
@@ -284,15 +362,37 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
     }
 
     let block_tags: std::collections::HashSet<&str> = [
-        "Entry", "Head", "Sense", "Subsense", "EXAMPLE", "GramExa",
-        "ColloExa", "Deriv", "RunOn", "PhrVbEntry", "GramBox", "Exponent",
-        "Section", "SECHEADING", "SpokenSect", "ThesBox", "ColloBox",
-        "F2NBox", "Crossref", "Hint", "ColloGram",
-    ].iter().copied().collect();
+        "Entry",
+        "Head",
+        "Sense",
+        "Subsense",
+        "EXAMPLE",
+        "GramExa",
+        "ColloExa",
+        "Deriv",
+        "RunOn",
+        "PhrVbEntry",
+        "GramBox",
+        "Exponent",
+        "Section",
+        "SECHEADING",
+        "SpokenSect",
+        "ThesBox",
+        "ColloBox",
+        "F2NBox",
+        "Crossref",
+        "Hint",
+        "ColloGram",
+    ]
+    .iter()
+    .copied()
+    .collect();
 
-    let skip_tags: std::collections::HashSet<&str> = [
-        "ACTIV", "INFLX", "SE_EntryAssets", "EntryAsset",
-    ].iter().copied().collect();
+    let skip_tags: std::collections::HashSet<&str> =
+        ["ACTIV", "INFLX", "SE_EntryAssets", "EntryAsset"]
+            .iter()
+            .copied()
+            .collect();
 
     for node in &nodes {
         match node {
@@ -304,14 +404,19 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 }
 
                 let style = style_for_tag(tag, attrs);
-                let indent = if block_tags.contains(tag.as_str()) { depth } else { current_block.indent };
+                let indent = if block_tags.contains(tag.as_str()) {
+                    depth
+                } else {
+                    current_block.indent
+                };
 
                 // Use a more specific tag name for sensenum spans so we can detect them in text nodes
-                let effective_tag = if tag == "span" && attr_get(attrs, "class").as_deref() == Some("sensenum") {
-                    "sensenum".to_owned()
-                } else {
-                    tag.clone()
-                };
+                let effective_tag =
+                    if tag == "span" && attr_get(attrs, "class").as_deref() == Some("sensenum") {
+                        "sensenum".to_owned()
+                    } else {
+                        tag.clone()
+                    };
 
                 if block_tags.contains(tag.as_str()) {
                     flush(&mut page, &mut current_block);
@@ -331,9 +436,11 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                         let title = match res.as_str() {
                             "gb_hwd_pron" => "British".to_owned(),
                             "us_hwd_pron" => "American".to_owned(),
-                            _             => "Play".to_owned(),
+                            _ => "Play".to_owned(),
                         };
-                        current_block.inlines.push(Inline::AudioButton { path, title });
+                        current_block
+                            .inlines
+                            .push(Inline::AudioButton { path, title });
                     }
                     "ILLUSTRATION" => {
                         let thumb = attr_get(attrs, "thumb").unwrap_or_default();
@@ -367,11 +474,12 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
 
             XmlNode::Close { tag } => {
                 // A "span" close may correspond to a "sensenum" entry on the stack
-                let search_tag = if tag == "span" && stack.iter().rev().any(|(t, _, _)| t == "sensenum") {
-                    "sensenum"
-                } else {
-                    tag.as_str()
-                };
+                let search_tag =
+                    if tag == "span" && stack.iter().rev().any(|(t, _, _)| t == "sensenum") {
+                        "sensenum"
+                    } else {
+                        tag.as_str()
+                    };
                 if let Some(pos) = stack.iter().rposition(|(t, _, _)| t == search_tag) {
                     let (_, _, d) = stack.remove(pos);
                     depth = d;
@@ -389,7 +497,9 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 let text = filtered.as_ref();
 
                 // Find the innermost non-skip style
-                let style = stack.iter().rev()
+                let style = stack
+                    .iter()
+                    .rev()
                     .find(|(t, _, _)| !skip_tags.contains(t.as_str()))
                     .map(|(_, s, _)| *s)
                     .unwrap_or_default();
@@ -405,14 +515,18 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 // Treat text as a headword only when directly inside HWD/BASE
                 // and NOT inside an INFLX subtree (which contains inflected forms
                 // we do not want merged into the entry title).
-                let inside_inflx = stack.iter().rev()
+                let inside_inflx = stack
+                    .iter()
+                    .rev()
                     .any(|(t, _, _)| t == "INFLX" || t == "SE_EntryAssets");
                 let is_headword = !inside_inflx
-                    && stack.iter().rev().any(|(t, _, _)| t == "HWD" || t == "BASE");
+                    && stack
+                        .iter()
+                        .rev()
+                        .any(|(t, _, _)| t == "HWD" || t == "BASE");
 
                 // Check if we're inside a sensenum span
-                let is_sensenum = stack.iter().rev()
-                    .any(|(t, _, _)| t == "sensenum");
+                let is_sensenum = stack.iter().rev().any(|(t, _, _)| t == "sensenum");
 
                 if is_headword {
                     current_block.push_headword(text);
@@ -432,39 +546,43 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
 
 fn style_for_tag(tag: &str, attrs: &[(String, String)]) -> Style {
     match tag {
-        "HWD" | "BASE"          => style_headword(),
-        "POS"                   => style_pos(),
-        "DEF"                   => style_def(),
-        "EXAMPLE" | "GramExa"
-        | "ColloExa"            => style_example(),
-        "Ref" | "NonDV"         => style_ref(),
-        "FIELD" | "REGISTERLAB"
-        | "ACTIV"               => style_label(),
+        "HWD" | "BASE" => style_headword(),
+        "POS" => style_pos(),
+        "DEF" => style_def(),
+        "EXAMPLE" | "GramExa" | "ColloExa" => style_example(),
+        "Ref" | "NonDV" => style_ref(),
+        "FIELD" | "REGISTERLAB" | "ACTIV" => style_label(),
         // Frequency badges (S1, W1, etc.) — bright green bold so they stand out
-        "FREQ"                  => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+        "FREQ" => Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
         // Grammar labels like [countable] — cyan
-        "GRAM"                  => Style::default().fg(Color::Cyan),
+        "GRAM" => Style::default().fg(Color::Cyan),
         // Pronunciation text — yellow so it's distinct from definition text
-        "PRON"                  => Style::default().fg(Color::Yellow),
+        "PRON" => Style::default().fg(Color::Yellow),
         // Main section heading (COLLOCATIONS, THESAURUS, …) — green bold
-        "HEADING"               => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-        "SECHEADING"            => style_heading(),
+        "HEADING" => Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+        "SECHEADING" => style_heading(),
         // Signpost labels in entries (e.g. "■ CAR JOURNEY")
-        "SIGNPOST"              => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        "SIGNPOST" => Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
         // Collocation-specific tags
-        "coll-head"             => Style::default().add_modifier(Modifier::BOLD),
-        "coll-note"             => Style::default().fg(Color::DarkGray),
+        "coll-head" => Style::default().add_modifier(Modifier::BOLD),
+        "coll-note" => Style::default().fg(Color::DarkGray),
         // COLLO marks the specific collocating word inside an example
-        "COLLO"                 => Style::default().add_modifier(Modifier::BOLD),
-        "span" => {
-            match attr_get(attrs, "class").as_deref() {
-                Some("sensenum")  => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-                Some("heading")   => style_heading(),
-                Some("def")       => style_def(),
-                Some("exabullet") => style_dim(),
-                _                 => style_default(),
-            }
-        }
+        "COLLO" => Style::default().add_modifier(Modifier::BOLD),
+        "span" => match attr_get(attrs, "class").as_deref() {
+            Some("sensenum") => Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            Some("heading") => style_heading(),
+            Some("def") => style_def(),
+            Some("exabullet") => style_dim(),
+            _ => style_default(),
+        },
         _ => style_default(),
     }
 }
@@ -485,9 +603,14 @@ pub fn transform_thesaurus(xml_chunks: &[&[u8]]) -> ContentPage {
         for node in &nodes {
             match node {
                 XmlNode::Open { tag, .. } => match tag.as_str() {
-                    "SECHEADING" => { in_secheading = true; current_heading.clear(); }
-                    "exp-head"   => { in_exp_head = true; }
-                    _            => {}
+                    "SECHEADING" => {
+                        in_secheading = true;
+                        current_heading.clear();
+                    }
+                    "exp-head" => {
+                        in_exp_head = true;
+                    }
+                    _ => {}
                 },
                 XmlNode::Close { tag } => match tag.as_str() {
                     "SECHEADING" => {
@@ -496,12 +619,15 @@ pub fn transform_thesaurus(xml_chunks: &[&[u8]]) -> ContentPage {
                         b.push_text(&current_heading, style_heading());
                         page.push(b);
                     }
-                    "exp-head"   => { in_exp_head = false; }
-                    _            => {}
+                    "exp-head" => {
+                        in_exp_head = false;
+                    }
+                    _ => {}
                 },
                 XmlNode::Text(t) => {
-                    if in_secheading { current_heading.push_str(t); }
-                    else if in_exp_head {
+                    if in_secheading {
+                        current_heading.push_str(t);
+                    } else if in_exp_head {
                         let mut b = Block::new(1);
                         b.push_text(t, style_default());
                         page.push(b);
@@ -527,15 +653,30 @@ pub fn transform_collocations(xml: &[u8]) -> ContentPage {
     for node in &nodes {
         match node {
             XmlNode::Open { tag, .. } => match tag.as_str() {
-                "HEADING"    => { heading_depth = 1; in_heading = true; current_heading.clear(); }
-                "SECHEADING" => { heading_depth = 2; in_heading = true; current_heading.clear(); }
-                "coll-head"  => { in_heading = true; current_heading.clear(); }
-                _            => {}
+                "HEADING" => {
+                    heading_depth = 1;
+                    in_heading = true;
+                    current_heading.clear();
+                }
+                "SECHEADING" => {
+                    heading_depth = 2;
+                    in_heading = true;
+                    current_heading.clear();
+                }
+                "coll-head" => {
+                    in_heading = true;
+                    current_heading.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
                 "HEADING" | "SECHEADING" | "coll-head" => {
                     in_heading = false;
-                    let style = if heading_depth <= 1 { style_heading() } else { style_pos() };
+                    let style = if heading_depth <= 1 {
+                        style_heading()
+                    } else {
+                        style_pos()
+                    };
                     let mut b = Block::new((heading_depth.saturating_sub(1)) as u8);
                     b.push_text(&current_heading, style);
                     page.push(b);
@@ -544,7 +685,9 @@ pub fn transform_collocations(xml: &[u8]) -> ContentPage {
                 _ => {}
             },
             XmlNode::Text(t) => {
-                if in_heading { current_heading.push_str(t); }
+                if in_heading {
+                    current_heading.push_str(t);
+                }
             }
         }
     }
@@ -567,36 +710,49 @@ pub fn transform_word_families(xml: &[u8]) -> ContentPage {
     for node in &nodes {
         match node {
             XmlNode::Open { tag, .. } => match tag.as_str() {
-                "group"    => { group_block = Some(Block::new(0)); }
-                "pos"      => { in_pos = true; pos_text.clear(); }
-                "Ref"      => { in_ref_hwd = true; ref_hwd.clear(); }
-                _          => {}
+                "group" => {
+                    group_block = Some(Block::new(0));
+                }
+                "pos" => {
+                    in_pos = true;
+                    pos_text.clear();
+                }
+                "Ref" => {
+                    in_ref_hwd = true;
+                    ref_hwd.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
                 "group" => {
                     if let Some(b) = group_block.take() {
-                        if !b.inlines.is_empty() { page.push(b); }
+                        if !b.inlines.is_empty() {
+                            page.push(b);
+                        }
                     }
                 }
-                "pos"   => {
+                "pos" => {
                     if let Some(b) = &mut group_block {
                         b.push_text(&pos_text, style_heading());
                         b.push_text(" ", style_default());
                     }
                     in_pos = false;
                 }
-                "Ref"   => {
+                "Ref" => {
                     if let Some(b) = &mut group_block {
                         b.push_text(&ref_hwd, style_ref());
                         b.push_text("  ", style_default());
                     }
                     in_ref_hwd = false;
                 }
-                _       => {}
+                _ => {}
             },
             XmlNode::Text(t) => {
-                if in_pos { pos_text.push_str(t); }
-                else if in_ref_hwd { ref_hwd.push_str(t); }
+                if in_pos {
+                    pos_text.push_str(t);
+                } else if in_ref_hwd {
+                    ref_hwd.push_str(t);
+                }
             }
         }
     }
@@ -618,9 +774,15 @@ pub fn transform_phrases(xml: &[u8]) -> ContentPage {
     for node in &nodes {
         match node {
             XmlNode::Open { tag, attrs } => match tag.as_str() {
-                "Ref"  => { in_ref_text = true; ref_text.clear(); }
-                "exa"  => { in_exa = true; exa_text.clear(); }
-                _      => {}
+                "Ref" => {
+                    in_ref_text = true;
+                    ref_text.clear();
+                }
+                "exa" => {
+                    in_exa = true;
+                    exa_text.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
                 "Ref" => {
@@ -636,11 +798,14 @@ pub fn transform_phrases(xml: &[u8]) -> ContentPage {
                     b.push_text(&exa_text, style_example());
                     page.push(b);
                 }
-                _     => {}
+                _ => {}
             },
             XmlNode::Text(t) => {
-                if in_ref_text { ref_text.push_str(t); }
-                else if in_exa { exa_text.push_str(t); }
+                if in_ref_text {
+                    ref_text.push_str(t);
+                } else if in_exa {
+                    exa_text.push_str(t);
+                }
             }
         }
     }
@@ -664,13 +829,24 @@ pub fn transform_examples(xml: &[u8]) -> ContentPage {
     for node in &nodes {
         match node {
             XmlNode::Open { tag, .. } => match tag.as_str() {
-                "hwd" => { in_hwd = true; hwd_text.clear(); }
-                "pos" => { in_pos = true; pos_text.clear(); }
-                "exa" => { in_exa = true; exa_text.clear(); }
-                _     => {}
+                "hwd" => {
+                    in_hwd = true;
+                    hwd_text.clear();
+                }
+                "pos" => {
+                    in_pos = true;
+                    pos_text.clear();
+                }
+                "exa" => {
+                    in_exa = true;
+                    exa_text.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
-                "hwd" => { in_hwd = false; }
+                "hwd" => {
+                    in_hwd = false;
+                }
                 "pos" => {
                     in_pos = false;
                     let mut b = Block::new(0);
@@ -686,12 +862,16 @@ pub fn transform_examples(xml: &[u8]) -> ContentPage {
                     b.push_text(&exa_text, style_example());
                     page.push(b);
                 }
-                _     => {}
+                _ => {}
             },
             XmlNode::Text(t) => {
-                if in_hwd { hwd_text.push_str(t); }
-                else if in_pos { pos_text.push_str(t); }
-                else if in_exa { exa_text.push_str(t); }
+                if in_hwd {
+                    hwd_text.push_str(t);
+                } else if in_pos {
+                    pos_text.push_str(t);
+                } else if in_exa {
+                    exa_text.push_str(t);
+                }
             }
         }
     }
@@ -711,7 +891,9 @@ pub fn transform_etymologies(xml: &[u8]) -> ContentPage {
             b.push_text(t, style_default());
         }
     }
-    if !b.inlines.is_empty() { page.push(b); }
+    if !b.inlines.is_empty() {
+        page.push(b);
+    }
     page
 }
 
@@ -723,23 +905,35 @@ pub fn transform_word_sets(xml_chunks: &[&[u8]]) -> ContentPage {
     let mut page = Vec::new();
     for xml in xml_chunks {
         let nodes = parse_xml(xml);
-        let mut in_name   = false;
+        let mut in_name = false;
         let mut in_number = false;
-        let mut in_hwd    = false;
-        let mut in_pos    = false;
-        let mut name_text   = String::new();
+        let mut in_hwd = false;
+        let mut in_pos = false;
+        let mut name_text = String::new();
         let mut number_text = String::new();
-        let mut hwd_text    = String::new();
-        let mut pos_text    = String::new();
+        let mut hwd_text = String::new();
+        let mut pos_text = String::new();
 
         for node in &nodes {
             match node {
                 XmlNode::Open { tag, .. } => match tag.as_str() {
-                    "name"   => { in_name   = true; name_text.clear(); }
-                    "number" => { in_number = true; number_text.clear(); }
-                    "hwd"    => { in_hwd    = true; hwd_text.clear(); }
-                    "pos"    => { in_pos    = true; pos_text.clear(); }
-                    _        => {}
+                    "name" => {
+                        in_name = true;
+                        name_text.clear();
+                    }
+                    "number" => {
+                        in_number = true;
+                        number_text.clear();
+                    }
+                    "hwd" => {
+                        in_hwd = true;
+                        hwd_text.clear();
+                    }
+                    "pos" => {
+                        in_pos = true;
+                        pos_text.clear();
+                    }
+                    _ => {}
                 },
                 XmlNode::Close { tag } => match tag.as_str() {
                     "number" => {
@@ -751,8 +945,10 @@ pub fn transform_word_sets(xml_chunks: &[&[u8]]) -> ContentPage {
                         b.push_text(")", style_default());
                         page.push(b);
                     }
-                    "name"   => { in_name = false; }
-                    "pos"    => {
+                    "name" => {
+                        in_name = false;
+                    }
+                    "pos" => {
                         in_pos = false;
                         let mut b = Block::new(1);
                         b.push_text(&hwd_text, style_ref());
@@ -760,14 +956,24 @@ pub fn transform_word_sets(xml_chunks: &[&[u8]]) -> ContentPage {
                         b.push_text(&pos_text, style_pos());
                         page.push(b);
                     }
-                    "hwd"    => { in_hwd = false; }
-                    _        => {}
+                    "hwd" => {
+                        in_hwd = false;
+                    }
+                    _ => {}
                 },
                 XmlNode::Text(t) => {
-                    if in_name   { name_text.push_str(t); }
-                    if in_number { number_text.push_str(t); }
-                    if in_hwd    { hwd_text.push_str(t); }
-                    if in_pos    { pos_text.push_str(t); }
+                    if in_name {
+                        name_text.push_str(t);
+                    }
+                    if in_number {
+                        number_text.push_str(t);
+                    }
+                    if in_hwd {
+                        hwd_text.push_str(t);
+                    }
+                    if in_pos {
+                        pos_text.push_str(t);
+                    }
                 }
             }
         }
@@ -792,12 +998,18 @@ pub fn transform_activator(concept_xml: &[u8], section_xml: &[u8], _sid: &str) -
     for node in &concept_nodes {
         match node {
             XmlNode::Open { tag, .. } => match tag.as_str() {
-                "HWD"     => { in_hwd = true; hwd_text.clear(); }
-                "Section" => { in_section = true; section_text.clear(); }
-                _         => {}
+                "HWD" => {
+                    in_hwd = true;
+                    hwd_text.clear();
+                }
+                "Section" => {
+                    in_section = true;
+                    section_text.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
-                "HWD"     => {
+                "HWD" => {
                     in_hwd = false;
                     let mut b = Block::new(0);
                     b.push_text(&hwd_text, style_heading());
@@ -810,11 +1022,15 @@ pub fn transform_activator(concept_xml: &[u8], section_xml: &[u8], _sid: &str) -
                     b.push_text(&section_text, style_ref());
                     page.push(b);
                 }
-                _         => {}
+                _ => {}
             },
             XmlNode::Text(t) => {
-                if in_hwd     { hwd_text.push_str(t); }
-                if in_section { section_text.push_str(t); }
+                if in_hwd {
+                    hwd_text.push_str(t);
+                }
+                if in_section {
+                    section_text.push_str(t);
+                }
             }
         }
     }
@@ -827,8 +1043,11 @@ pub fn transform_activator(concept_xml: &[u8], section_xml: &[u8], _sid: &str) -
     for node in &section_nodes {
         match node {
             XmlNode::Open { tag, .. } => match tag.as_str() {
-                "SECDEF" => { in_secdef = true; secdef_text.clear(); }
-                _        => {}
+                "SECDEF" => {
+                    in_secdef = true;
+                    secdef_text.clear();
+                }
+                _ => {}
             },
             XmlNode::Close { tag } => match tag.as_str() {
                 "SECDEF" => {
@@ -837,10 +1056,12 @@ pub fn transform_activator(concept_xml: &[u8], section_xml: &[u8], _sid: &str) -
                     b.push_text(&secdef_text, style_heading());
                     page.push(b);
                 }
-                _        => {}
+                _ => {}
             },
             XmlNode::Text(t) => {
-                if in_secdef { secdef_text.push_str(t); }
+                if in_secdef {
+                    secdef_text.push_str(t);
+                }
             }
         }
     }
@@ -857,11 +1078,11 @@ pub fn transform_activator(concept_xml: &[u8], section_xml: &[u8], _sid: &str) -
 /// Transform XML bytes for a given `ContentType` into a `ContentPage`.
 pub fn transform(content_type: ContentType, xml: &[u8]) -> ContentPage {
     match content_type {
-        ContentType::Entry       => transform_entry(xml),
+        ContentType::Entry => transform_entry(xml),
         ContentType::Etymologies => transform_etymologies(xml),
-        ContentType::Phrases     => transform_phrases(xml),
-        ContentType::Examples    => transform_examples(xml),
-        _                        => {
+        ContentType::Phrases => transform_phrases(xml),
+        ContentType::Examples => transform_examples(xml),
+        _ => {
             // Fallback: just show all text
             let mut b = Block::new(0);
             for node in &parse_xml(xml) {
@@ -896,12 +1117,18 @@ mod tests {
     <EXAMPLE><span class="exabullet">●</span>{example}</EXAMPLE>
   </Sense>
 </Entry>"#
-        ).into_bytes()
+        )
+        .into_bytes()
     }
 
     #[test]
     fn test_transform_entry_produces_blocks() {
-        let xml = entry_xml("run", "verb", "to move quickly on foot", "She ran to the door.");
+        let xml = entry_xml(
+            "run",
+            "verb",
+            "to move quickly on foot",
+            "She ran to the door.",
+        );
         let page = transform_entry(&xml);
         assert!(!page.is_empty(), "page should not be empty");
     }
@@ -910,7 +1137,8 @@ mod tests {
     fn test_transform_entry_headword_present() {
         let xml = entry_xml("run", "verb", "to move quickly", "He runs daily.");
         let page = transform_entry(&xml);
-        let all_text: String = page.iter()
+        let all_text: String = page
+            .iter()
             .flat_map(|b| b.inlines.iter())
             .filter_map(|i| match i {
                 Inline::Text(t, _) => Some(t.as_str()),
@@ -923,20 +1151,30 @@ mod tests {
 
     #[test]
     fn test_transform_entry_audio_buttons() {
-        let xml = entry_xml("able", "adjective", "having the skill", "She is able to swim.");
+        let xml = entry_xml(
+            "able",
+            "adjective",
+            "having the skill",
+            "She is able to swim.",
+        );
         let page = transform_entry(&xml);
-        let audio_count = page.iter()
+        let audio_count = page
+            .iter()
             .flat_map(|b| b.inlines.iter())
             .filter(|i| matches!(i, Inline::AudioButton { .. }))
             .count();
-        assert!(audio_count >= 2, "expected at least 2 audio buttons, got {audio_count}");
+        assert!(
+            audio_count >= 2,
+            "expected at least 2 audio buttons, got {audio_count}"
+        );
     }
 
     #[test]
     fn test_transform_entry_example_text() {
         let xml = entry_xml("walk", "verb", "to move on foot", "She walked to school.");
         let page = transform_entry(&xml);
-        let all_text: String = page.iter()
+        let all_text: String = page
+            .iter()
             .flat_map(|b| b.inlines.iter())
             .filter_map(|i| match i {
                 Inline::Text(t, _) => Some(t.as_str()),
@@ -965,9 +1203,14 @@ mod tests {
           </exa-body>
         </exa-root>"#;
         let page = transform_examples(xml);
-        let all_text: String = page.iter()
+        let all_text: String = page
+            .iter()
             .flat_map(|b| b.inlines.iter())
-            .filter_map(|i| match i { Inline::Text(t, _) => Some(t.as_str()), Inline::Headword(t) => Some(t.as_str()), _ => None })
+            .filter_map(|i| match i {
+                Inline::Text(t, _) => Some(t.as_str()),
+                Inline::Headword(t) => Some(t.as_str()),
+                _ => None,
+            })
             .collect();
         assert!(all_text.contains("run"));
         assert!(all_text.contains("ran"));
@@ -977,9 +1220,14 @@ mod tests {
     fn test_transform_etymologies() {
         let xml = b"<etym>From Latin <i>currere</i>, to run.</etym>";
         let page = transform_etymologies(xml);
-        let all_text: String = page.iter()
+        let all_text: String = page
+            .iter()
             .flat_map(|b| b.inlines.iter())
-            .filter_map(|i| match i { Inline::Text(t, _) => Some(t.as_str()), Inline::Headword(t) => Some(t.as_str()), _ => None })
+            .filter_map(|i| match i {
+                Inline::Text(t, _) => Some(t.as_str()),
+                Inline::Headword(t) => Some(t.as_str()),
+                _ => None,
+            })
             .collect();
         assert!(all_text.contains("Latin"));
     }

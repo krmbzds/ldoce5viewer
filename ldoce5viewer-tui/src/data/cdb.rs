@@ -224,8 +224,7 @@ impl<W: Write + Seek> CDBMaker<W> {
                 let mut placed = false;
                 for offset in (ini..num).chain(0..ini) {
                     let p = offset * 8;
-                    let existing_ptr =
-                        u32::from_le_bytes(buf[p + 4..p + 8].try_into().unwrap());
+                    let existing_ptr = u32::from_le_bytes(buf[p + 4..p + 8].try_into().unwrap());
                     if existing_ptr == 0 {
                         buf[p..p + 4].copy_from_slice(&hashed.to_le_bytes());
                         buf[p + 4..p + 8].copy_from_slice(&pointer.to_le_bytes());
@@ -303,9 +302,17 @@ mod tests {
     #[test]
     fn test_multiple_entries() {
         let pairs: Vec<(Vec<u8>, Vec<u8>)> = (0..50u8)
-            .map(|i| (format!("key{i}").into_bytes(), format!("val{i}").into_bytes()))
+            .map(|i| {
+                (
+                    format!("key{i}").into_bytes(),
+                    format!("val{i}").into_bytes(),
+                )
+            })
             .collect();
-        let refs: Vec<(&[u8], &[u8])> = pairs.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+        let refs: Vec<(&[u8], &[u8])> = pairs
+            .iter()
+            .map(|(k, v)| (k.as_slice(), v.as_slice()))
+            .collect();
         let reader = round_trip(&refs);
         for (k, v) in &pairs {
             assert_eq!(reader.get(k), Some(v.clone()), "key {:?}", k);

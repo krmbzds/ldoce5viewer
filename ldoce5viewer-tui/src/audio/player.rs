@@ -23,17 +23,17 @@ pub enum AudioError {
 /// across calls to avoid repeated device initialisation overhead.
 pub struct AudioPlayer {
     /// The output stream (must stay alive as long as the player is used).
-    _stream:  OutputStream,
-    handle:   OutputStreamHandle,
+    _stream: OutputStream,
+    handle: OutputStreamHandle,
     /// Currently active sink (if any).
-    sink:     Mutex<Option<Sink>>,
+    sink: Mutex<Option<Sink>>,
 }
 
 impl AudioPlayer {
     /// Create a new player, opening the default audio output device.
     pub fn new() -> Result<Self, AudioError> {
-        let (stream, handle) = OutputStream::try_default()
-            .map_err(|e| AudioError::NoDevice(e.to_string()))?;
+        let (stream, handle) =
+            OutputStream::try_default().map_err(|e| AudioError::NoDevice(e.to_string()))?;
         Ok(AudioPlayer {
             _stream: stream,
             handle,
@@ -47,11 +47,9 @@ impl AudioPlayer {
         self.stop();
 
         let cursor = Cursor::new(data);
-        let decoder = Decoder::new(cursor)
-            .map_err(|e| AudioError::Decode(e.to_string()))?;
+        let decoder = Decoder::new(cursor).map_err(|e| AudioError::Decode(e.to_string()))?;
 
-        let sink = Sink::try_new(&self.handle)
-            .map_err(|e| AudioError::Playback(e.to_string()))?;
+        let sink = Sink::try_new(&self.handle).map_err(|e| AudioError::Playback(e.to_string()))?;
         sink.append(decoder);
         // Detach: playback continues in the background thread managed by rodio.
         *self.sink.lock().unwrap() = Some(sink);

@@ -1,7 +1,10 @@
 //! Integration tests for the XML → ratatui content transformer.
 
 use ldoce5viewer_tui::content::{
-    transform::{to_ratatui_text, transform_entry, transform_examples, transform_etymologies, transform_phrases, Block, Inline},
+    transform::{
+        to_ratatui_text, transform_entry, transform_etymologies, transform_examples,
+        transform_phrases, Block, Inline,
+    },
     types::{ContentId, ContentType},
 };
 
@@ -31,7 +34,7 @@ fn all_text(page: &[Block]) -> String {
     page.iter()
         .flat_map(|b| b.inlines.iter())
         .filter_map(|i| match i {
-            Inline::Text(t, _)  => Some(t.as_str()),
+            Inline::Text(t, _) => Some(t.as_str()),
             Inline::Headword(t) => Some(t.as_str()),
             _ => None,
         })
@@ -53,7 +56,10 @@ fn count_audio(page: &[Block]) -> usize {
 fn test_entry_headword_found() {
     let xml = entry_xml("run", "verb", "to move quickly", "She ran every day.");
     let page = transform_entry(&xml);
-    assert!(all_text(&page).contains("run"), "headword 'run' missing from page");
+    assert!(
+        all_text(&page).contains("run"),
+        "headword 'run' missing from page"
+    );
 }
 
 #[test]
@@ -65,23 +71,47 @@ fn test_entry_pos_found() {
 
 #[test]
 fn test_entry_definition_found() {
-    let xml = entry_xml("walk", "verb", "to move on foot at a normal speed", "I walked to school.");
+    let xml = entry_xml(
+        "walk",
+        "verb",
+        "to move on foot at a normal speed",
+        "I walked to school.",
+    );
     let page = transform_entry(&xml);
-    assert!(all_text(&page).contains("move on foot"), "definition text missing");
+    assert!(
+        all_text(&page).contains("move on foot"),
+        "definition text missing"
+    );
 }
 
 #[test]
 fn test_entry_example_found() {
-    let xml = entry_xml("jump", "verb", "to push up into the air", "She jumped over the puddle.");
+    let xml = entry_xml(
+        "jump",
+        "verb",
+        "to push up into the air",
+        "She jumped over the puddle.",
+    );
     let page = transform_entry(&xml);
-    assert!(all_text(&page).contains("puddle"), "example sentence missing");
+    assert!(
+        all_text(&page).contains("puddle"),
+        "example sentence missing"
+    );
 }
 
 #[test]
 fn test_entry_audio_buttons_gb_us() {
-    let xml = entry_xml("able", "adjective", "having the skill", "She is able to help.");
+    let xml = entry_xml(
+        "able",
+        "adjective",
+        "having the skill",
+        "She is able to help.",
+    );
     let page = transform_entry(&xml);
-    assert!(count_audio(&page) >= 2, "expected ≥2 audio buttons (GB + US)");
+    assert!(
+        count_audio(&page) >= 2,
+        "expected ≥2 audio buttons (GB + US)"
+    );
 }
 
 #[test]
@@ -101,7 +131,8 @@ fn test_entry_empty_xml_does_not_panic() {
 fn test_entry_illustration_placeholder() {
     let xml = b"<Entry><ILLUSTRATION thumb='pictures/apple.jpg'/></Entry>";
     let page = transform_entry(xml);
-    let has_img = page.iter()
+    let has_img = page
+        .iter()
         .flat_map(|b| b.inlines.iter())
         .any(|i| matches!(i, Inline::Image { .. }));
     assert!(has_img, "image inline expected");
@@ -111,7 +142,8 @@ fn test_entry_illustration_placeholder() {
 fn test_entry_link_target() {
     let xml = br#"<Entry><Sense><Ref topic="fs/1.2.3">See also</Ref></Sense></Entry>"#;
     let page = transform_entry(xml);
-    let has_link = page.iter()
+    let has_link = page
+        .iter()
         .flat_map(|b| b.inlines.iter())
         .any(|i| matches!(i, Inline::Link { target, .. } if target.contains("1.2.3")));
     assert!(has_link, "link with correct target expected");
@@ -140,7 +172,10 @@ fn test_examples_headword_present() {
 fn test_etymologies_text_present() {
     let xml = b"<etym>From Old English <i>rinnand</i>.</etym>";
     let page = transform_etymologies(xml);
-    assert!(all_text(&page).contains("Old English"), "etymology text missing");
+    assert!(
+        all_text(&page).contains("Old English"),
+        "etymology text missing"
+    );
 }
 
 // --------------------------------------------------------------------------
@@ -175,12 +210,25 @@ fn test_inflx_content_excluded_from_headword() {
     </Entry>"#;
     let page = transform_entry(xml);
     // The headword inline should only contain "car", not "car cars"
-    let headword_text: String = page.iter()
+    let headword_text: String = page
+        .iter()
         .flat_map(|b| b.inlines.iter())
-        .filter_map(|i| if let Inline::Headword(t) = i { Some(t.as_str()) } else { None })
+        .filter_map(|i| {
+            if let Inline::Headword(t) = i {
+                Some(t.as_str())
+            } else {
+                None
+            }
+        })
         .collect();
-    assert!(headword_text.contains("car"),  "headword 'car' should be present");
-    assert!(!headword_text.contains("cars"), "INFLX 'cars' must NOT appear in headword inline");
+    assert!(
+        headword_text.contains("car"),
+        "headword 'car' should be present"
+    );
+    assert!(
+        !headword_text.contains("cars"),
+        "INFLX 'cars' must NOT appear in headword inline"
+    );
 }
 
 /// ¿[Play], ¿[British], ¿[American] markers must be stripped from text output.
@@ -189,9 +237,15 @@ fn test_audio_markers_stripped() {
     let xml = b"<Entry><Sense><EXAMPLE>\xC2\xBF[Play]She ran fast.</EXAMPLE></Sense></Entry>";
     let page = transform_entry(xml);
     let text = all_text(&page);
-    assert!(text.contains("She ran fast."), "example text must survive stripping");
-    assert!(!text.contains('\u{00BF}'), "inverted-question-mark marker must be stripped");
-    assert!(!text.contains("[Play]"),    "[Play] marker must be stripped");
+    assert!(
+        text.contains("She ran fast."),
+        "example text must survive stripping"
+    );
+    assert!(
+        !text.contains('\u{00BF}'),
+        "inverted-question-mark marker must be stripped"
+    );
+    assert!(!text.contains("[Play]"), "[Play] marker must be stripped");
 }
 
 /// Each ColloGram entry must produce its own block, not merge into one long line.
@@ -213,16 +267,27 @@ fn test_collograms_are_separate_blocks() {
     </Entry>"#;
     let page = transform_entry(xml);
     // There should be at least 4 blocks: 2 × (coll-head block + ColloExa block)
-    assert!(page.len() >= 4, "expected ≥4 blocks for 2 ColloGram entries, got {}", page.len());
+    assert!(
+        page.len() >= 4,
+        "expected ≥4 blocks for 2 ColloGram entries, got {}",
+        page.len()
+    );
 }
-
 
 #[test]
 fn test_to_ratatui_text_line_count() {
-    let xml = entry_xml("cat", "noun", "a small furry animal", "The cat sat on the mat.");
+    let xml = entry_xml(
+        "cat",
+        "noun",
+        "a small furry animal",
+        "The cat sat on the mat.",
+    );
     let page = transform_entry(&xml);
     let text = to_ratatui_text(&page);
-    assert!(!text.lines.is_empty(), "ratatui Text must have at least one line");
+    assert!(
+        !text.lines.is_empty(),
+        "ratatui Text must have at least one line"
+    );
 }
 
 #[test]

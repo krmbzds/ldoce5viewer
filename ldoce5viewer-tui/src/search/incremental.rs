@@ -73,10 +73,10 @@ pub enum IncrementalError {
 
 #[derive(Debug, Clone)]
 pub struct IncrementalResult {
-    pub label:    String,
-    pub path:     String,
-    pub plain:    String,
-    pub prio:     u8,
+    pub label: String,
+    pub path: String,
+    pub plain: String,
+    pub prio: u8,
     pub typecode: String,
 }
 
@@ -85,7 +85,7 @@ pub struct IncrementalResult {
 // --------------------------------------------------------------------------
 
 pub struct IncrementalSearcher {
-    mmap:  Mmap,
+    mmap: Mmap,
     count: u32,
     first: u32,
 }
@@ -97,10 +97,10 @@ impl IncrementalSearcher {
         if mmap.len() < 16 {
             return Err(IncrementalError::TooSmall);
         }
-        let magic   = u32::from_le_bytes(mmap[0..4].try_into().unwrap());
+        let magic = u32::from_le_bytes(mmap[0..4].try_into().unwrap());
         let version = u32::from_le_bytes(mmap[4..8].try_into().unwrap());
-        let count   = u32::from_le_bytes(mmap[8..12].try_into().unwrap());
-        let first   = u32::from_le_bytes(mmap[12..16].try_into().unwrap());
+        let count = u32::from_le_bytes(mmap[8..12].try_into().unwrap());
+        let first = u32::from_le_bytes(mmap[12..16].try_into().unwrap());
 
         if magic != MAGIC {
             return Err(IncrementalError::WrongMagic);
@@ -193,24 +193,30 @@ fn decode_record(mm: &Mmap, off: usize) -> Option<IncrementalResult> {
     if off + 8 > mm.len() {
         return None;
     }
-    let len_plain    = u16::from_le_bytes(mm[off..off + 2].try_into().ok()?) as usize;
+    let len_plain = u16::from_le_bytes(mm[off..off + 2].try_into().ok()?) as usize;
     let len_typecode = mm[off + 2] as usize;
-    let len_label    = u16::from_le_bytes(mm[off + 3..off + 5].try_into().ok()?) as usize;
-    let len_path     = u16::from_le_bytes(mm[off + 5..off + 7].try_into().ok()?) as usize;
-    let prio         = mm[off + 7];
-    let data_off     = off + 8;
-    let data_end     = data_off + len_plain + len_typecode + len_label + len_path;
+    let len_label = u16::from_le_bytes(mm[off + 3..off + 5].try_into().ok()?) as usize;
+    let len_path = u16::from_le_bytes(mm[off + 5..off + 7].try_into().ok()?) as usize;
+    let prio = mm[off + 7];
+    let data_off = off + 8;
+    let data_end = data_off + len_plain + len_typecode + len_label + len_path;
     if data_end > mm.len() {
         return None;
     }
-    let plain    = String::from_utf8_lossy(&mm[data_off..data_off + len_plain]).into_owned();
-    let tc_off   = data_off + len_plain;
+    let plain = String::from_utf8_lossy(&mm[data_off..data_off + len_plain]).into_owned();
+    let tc_off = data_off + len_plain;
     let typecode = String::from_utf8_lossy(&mm[tc_off..tc_off + len_typecode]).into_owned();
-    let lb_off   = tc_off + len_typecode;
-    let label    = String::from_utf8_lossy(&mm[lb_off..lb_off + len_label]).into_owned();
-    let pt_off   = lb_off + len_label;
-    let path     = String::from_utf8_lossy(&mm[pt_off..pt_off + len_path]).into_owned();
-    Some(IncrementalResult { label, path, plain, prio, typecode })
+    let lb_off = tc_off + len_typecode;
+    let label = String::from_utf8_lossy(&mm[lb_off..lb_off + len_label]).into_owned();
+    let pt_off = lb_off + len_label;
+    let path = String::from_utf8_lossy(&mm[pt_off..pt_off + len_path]).into_owned();
+    Some(IncrementalResult {
+        label,
+        path,
+        plain,
+        prio,
+        typecode,
+    })
 }
 
 // --------------------------------------------------------------------------
@@ -219,11 +225,11 @@ fn decode_record(mm: &Mmap, off: usize) -> Option<IncrementalResult> {
 
 /// Writes an incremental search index.
 pub struct IncrementalMaker {
-    path:     std::path::PathBuf,
+    path: std::path::PathBuf,
     tmp_path: std::path::PathBuf,
-    tmpf:     std::fs::File,
+    tmpf: std::fs::File,
     /// (file_offset, normalised_plain, prio)
-    items:    Vec<(u32, String, u8)>,
+    items: Vec<(u32, String, u8)>,
 }
 
 impl IncrementalMaker {
@@ -240,11 +246,11 @@ impl IncrementalMaker {
     /// Add one item to the index.
     pub fn add_item(
         &mut self,
-        plain:    &str,
+        plain: &str,
         typecode: &str,
-        label:    &str,
-        path:     &str,
-        prio:     u8,
+        label: &str,
+        path: &str,
+        prio: u8,
     ) -> io::Result<()> {
         let plain_n = normalize_index_key(plain);
         let plain_e = plain_n.as_bytes();
@@ -344,11 +350,11 @@ mod tests {
     }
 
     const ITEMS: &[(&str, &str, &str, &str, u8)] = &[
-        ("apple",       "hw", "Apple",       "entry/apple",       0),
+        ("apple", "hw", "Apple", "entry/apple", 0),
         ("application", "hw", "Application", "entry/application", 0),
-        ("apply",       "hw", "Apply",       "entry/apply",       1),
-        ("banana",      "hw", "Banana",      "entry/banana",      0),
-        ("band",        "hw", "Band",        "entry/band",        0),
+        ("apply", "hw", "Apply", "entry/apply", 1),
+        ("banana", "hw", "Banana", "entry/banana", 0),
+        ("band", "hw", "Band", "entry/band", 0),
     ];
 
     #[test]
@@ -358,10 +364,10 @@ mod tests {
         let searcher = IncrementalSearcher::open(&idx).unwrap();
         let results = searcher.search("appl", 10);
         let labels: Vec<&str> = results.iter().map(|r| r.label.as_str()).collect();
-        assert!(labels.contains(&"Apple"),       "Apple missing");
+        assert!(labels.contains(&"Apple"), "Apple missing");
         assert!(labels.contains(&"Application"), "Application missing");
-        assert!(labels.contains(&"Apply"),       "Apply missing");
-        assert!(!labels.contains(&"Banana"),     "Banana should not match");
+        assert!(labels.contains(&"Apply"), "Apply missing");
+        assert!(!labels.contains(&"Banana"), "Banana should not match");
     }
 
     #[test]
@@ -437,10 +443,10 @@ mod tests {
     #[test]
     fn test_normalize_index_key() {
         assert_eq!(normalize_index_key("  Hello  "), "hello");
-        assert_eq!(normalize_index_key("café"),      "cafe");
-        assert_eq!(normalize_index_key("UPPER"),     "upper");
-        assert_eq!(normalize_index_key(""),          "");
+        assert_eq!(normalize_index_key("café"), "cafe");
+        assert_eq!(normalize_index_key("UPPER"), "upper");
+        assert_eq!(normalize_index_key(""), "");
         // copyright sign → 'c'
-        assert_eq!(normalize_index_key("\u{00a9}"),  "c");
+        assert_eq!(normalize_index_key("\u{00a9}"), "c");
     }
 }

@@ -46,12 +46,17 @@ impl<'a> Widget for ContentView<'a> {
         let block = RatatuiBlock::default()
             .borders(Borders::ALL)
             .border_style(border_style)
-            .title(Span::styled(title, Style::default().add_modifier(Modifier::BOLD)));
+            .title(Span::styled(
+                title,
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if inner.height == 0 || inner.width == 0 { return; }
+        if inner.height == 0 || inner.width == 0 {
+            return;
+        }
 
         if let Some(page) = &self.app.content_page {
             // Use find-highlighting renderer when find mode is active, plain otherwise.
@@ -61,7 +66,11 @@ impl<'a> Widget for ContentView<'a> {
                 to_ratatui_text(page)
             };
             let total_lines = text.lines.len();
-            let scroll_y = if total_lines == 0 { 0 } else { self.app.content_scroll.min(total_lines.saturating_sub(1)) } as u16;
+            let scroll_y = if total_lines == 0 {
+                0
+            } else {
+                self.app.content_scroll.min(total_lines.saturating_sub(1))
+            } as u16;
 
             let para = Paragraph::new(text).scroll((scroll_y, self.app.content_scroll_x));
             if self.app.config.content_wrap {
@@ -80,7 +89,9 @@ impl<'a> Widget for ContentView<'a> {
                 Line::from(""),
                 Line::from(vec![Span::styled(
                     "  Keyboard shortcuts:",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
                 )]),
                 Line::from(vec![Span::styled(
                     "    /          Focus search box",
@@ -162,15 +173,15 @@ fn build_ratatui_text<'t>(
     let mut lines: Vec<Line> = Vec::new();
     for (block_idx, block) in page.iter().enumerate() {
         let block_text: String = block
-        .inlines
-        .iter()
-        .filter_map(|i| match i {
-            Inline::Text(t, _) => Some(t.as_str()),
-            Inline::Headword(t) => Some(t.as_str()),
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("");
+            .inlines
+            .iter()
+            .filter_map(|i| match i {
+                Inline::Text(t, _) => Some(t.as_str()),
+                Inline::Headword(t) => Some(t.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("");
 
         if match_set.contains(&block_idx) && !q.is_empty() {
             // Highlight all occurrences of `q` within the block
@@ -190,7 +201,7 @@ fn build_ratatui_text<'t>(
                     block_text[abs..abs + q.len()].to_owned(),
                     Style::default().bg(Color::Yellow).fg(Color::Black),
                 ));
-                prev  = abs + q.len();
+                prev = abs + q.len();
                 start = abs + q.len();
             }
             if prev < block_text.len() {
@@ -211,7 +222,10 @@ fn build_ratatui_text<'t>(
 }
 
 fn path_to_title(path: &str) -> &str {
-    path.trim_start_matches('/').split('/').last().unwrap_or(path)
+    path.trim_start_matches('/')
+        .split('/')
+        .last()
+        .unwrap_or(path)
 }
 
 fn extract_headword(page: &[crate::content::transform::Block]) -> Option<String> {
@@ -220,7 +234,9 @@ fn extract_headword(page: &[crate::content::transform::Block]) -> Option<String>
         for inline in &block.inlines {
             if let crate::content::transform::Inline::Headword(text) = inline {
                 let s = text.trim();
-                if !s.is_empty() { return Some(s.to_string()); }
+                if !s.is_empty() {
+                    return Some(s.to_string());
+                }
             }
         }
     }
@@ -234,7 +250,7 @@ mod tests {
     #[test]
     fn test_path_to_title() {
         assert_eq!(path_to_title("/fs/3.4.6.2"), "3.4.6.2");
-        assert_eq!(path_to_title("entry"),       "entry");
-        assert_eq!(path_to_title(""),            "");
+        assert_eq!(path_to_title("entry"), "entry");
+        assert_eq!(path_to_title(""), "");
     }
 }

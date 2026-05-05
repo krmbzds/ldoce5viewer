@@ -22,8 +22,7 @@ impl<'a> Widget for StatusBar<'a> {
         // Compute padding
         let lw: usize = left.iter().map(|s| s.content.len()).sum();
         let rw: usize = right.iter().map(|s| s.content.len()).sum();
-        let pad = (area.width as usize)
-            .saturating_sub(lw + rw);
+        let pad = (area.width as usize).saturating_sub(lw + rw);
 
         let mut spans = left;
         spans.push(Span::raw(" ".repeat(pad)));
@@ -37,13 +36,13 @@ impl<'a> Widget for StatusBar<'a> {
 
 fn build_left(app: &App) -> Vec<Span<'static>> {
     let mode_label = match app.mode {
-        AppMode::Searching      => " SEARCH ",
-        AppMode::Normal         => " NORMAL ",
+        AppMode::Searching => " SEARCH ",
+        AppMode::Normal => " NORMAL ",
         AppMode::ContentFocused => " CONTENT",
-        AppMode::FindInPage     => " FIND   ",
+        AppMode::FindInPage => " FIND   ",
         AppMode::AdvancedSearch => " ADV    ",
-        AppMode::BuildingIndex  => " BUILD  ",
-        AppMode::Quit           => " QUIT   ",
+        AppMode::BuildingIndex => " BUILD  ",
+        AppMode::Quit => " QUIT   ",
     };
     let mode_style = Style::default()
         .bg(Color::Blue)
@@ -53,9 +52,20 @@ fn build_left(app: &App) -> Vec<Span<'static>> {
     let mut spans = vec![Span::styled(mode_label.to_owned(), mode_style)];
 
     // Show "◀ ▶" nav indicators
-    let back = if app.history.can_go_back()    { "◀ " } else { "  " };
-    let fwd  = if app.history.can_go_forward() { "▶ " } else { "  " };
-    spans.push(Span::styled(format!(" {back}{fwd}"), Style::default().fg(Color::White)));
+    let back = if app.history.can_go_back() {
+        "◀ "
+    } else {
+        "  "
+    };
+    let fwd = if app.history.can_go_forward() {
+        "▶ "
+    } else {
+        "  "
+    };
+    spans.push(Span::styled(
+        format!(" {back}{fwd}"),
+        Style::default().fg(Color::White),
+    ));
 
     // Status message
     if !app.status.is_empty() {
@@ -67,7 +77,10 @@ fn build_left(app: &App) -> Vec<Span<'static>> {
 
     // "Searching…" spinner
     if app.is_searching {
-        spans.push(Span::styled("  ⟳ Searching…", Style::default().fg(Color::Cyan)));
+        spans.push(Span::styled(
+            "  ⟳ Searching…",
+            Style::default().fg(Color::Cyan),
+        ));
     }
 
     spans
@@ -79,11 +92,14 @@ fn build_right(app: &App) -> Vec<Span<'static>> {
     // Auto-pron indicator
     let pron_label = match app.config.auto_pron {
         crate::config::AutoPronLanguage::Off => "",
-        crate::config::AutoPronLanguage::GB  => "🔊GB ",
-        crate::config::AutoPronLanguage::US  => "🔊US ",
+        crate::config::AutoPronLanguage::GB => "🔊GB ",
+        crate::config::AutoPronLanguage::US => "🔊US ",
     };
     if !pron_label.is_empty() {
-        parts.push(Span::styled(pron_label.to_owned(), Style::default().fg(Color::Green)));
+        parts.push(Span::styled(
+            pron_label.to_owned(),
+            Style::default().fg(Color::Green),
+        ));
     }
 
     // Clipboard monitor indicator
@@ -119,7 +135,9 @@ pub struct FindBar<'a> {
 
 impl<'a> Widget for FindBar<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if self.app.mode != AppMode::FindInPage { return; }
+        if self.app.mode != AppMode::FindInPage {
+            return;
+        }
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -128,16 +146,24 @@ impl<'a> Widget for FindBar<'a> {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if inner.height == 0 { return; }
+        if inner.height == 0 {
+            return;
+        }
 
         let match_count = self.app.find_matches.len();
-        let current = if match_count == 0 { 0 } else { self.app.find_cursor + 1 };
+        let current = if match_count == 0 {
+            0
+        } else {
+            self.app.find_cursor + 1
+        };
 
         let mut spans = vec![
             Span::raw("Find: "),
             Span::styled(
                 self.app.find_text.clone(),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::raw("  "),
         ];

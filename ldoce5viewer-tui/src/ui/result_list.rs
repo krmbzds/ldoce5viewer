@@ -35,7 +35,9 @@ impl<'a> Widget for ResultList<'a> {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        if inner.height == 0 { return; }
+        if inner.height == 0 {
+            return;
+        }
 
         let items: Vec<ListItem> = self
             .app
@@ -49,13 +51,12 @@ impl<'a> Widget for ResultList<'a> {
         let mut state = ListState::default();
         state.select(self.app.selected_row);
 
-        let list = List::new(items)
-            .highlight_style(
-                Style::default()
-                    .bg(Color::Blue)
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            );
+        let list = List::new(items).highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        );
 
         ratatui::widgets::StatefulWidget::render(list, inner, buf, &mut state);
     }
@@ -86,7 +87,11 @@ fn render_result_item(item: &SearchResultItem, _selected: bool) -> ListItem<'sta
     // safety net for any remaining repetition.
     let mut deduped: Vec<(String, Style)> = Vec::new();
     for (tok, style) in tokens {
-        if deduped.last().map(|(p, _)| p.eq_ignore_ascii_case(&tok)).unwrap_or(false) {
+        if deduped
+            .last()
+            .map(|(p, _)| p.eq_ignore_ascii_case(&tok))
+            .unwrap_or(false)
+        {
             continue;
         }
         deduped.push((tok, style));
@@ -147,13 +152,14 @@ fn remove_plain_prefix(mut tokens: Vec<(String, Style)>) -> Vec<(String, Style)>
     tokens
 }
 
-
 fn parse_label_to_spans(s: &str) -> Vec<(String, Style)> {
     // Simple tag -> style mapping. Only a small subset of tags used by the
     // label generator are handled here; unknown tags are ignored.
     fn style_for_tag(tag: &str) -> Style {
         match tag {
-            "h" | "H" | "hw" => Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            "h" | "H" | "hw" => Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
             "v" => Style::default().fg(Color::Magenta),
             "p" => Style::default().fg(Color::Yellow),
             "f" => Style::default().add_modifier(Modifier::DIM),
@@ -179,24 +185,36 @@ fn parse_label_to_spans(s: &str) -> Vec<(String, Style)> {
             let mut tagname = String::new();
             let mut is_close = false;
             if let Some(&c) = chars.peek() {
-                if c == '/' { is_close = true; chars.next(); }
+                if c == '/' {
+                    is_close = true;
+                    chars.next();
+                }
             }
             while let Some(&c) = chars.peek() {
                 chars.next();
-                if c == '>' { break; }
-                if c.is_whitespace() { break; }
+                if c == '>' {
+                    break;
+                }
+                if c.is_whitespace() {
+                    break;
+                }
                 tagname.push(c);
             }
             // skip until '>' if not already
             while let Some(&c) = chars.peek() {
-                if c == '>' { chars.next(); break; }
+                if c == '>' {
+                    chars.next();
+                    break;
+                }
                 chars.next();
             }
             let tagname = tagname.trim();
             if is_close {
                 // pop matching style (best-effort)
                 // If stack empty, ignore
-                if !style_stack.is_empty() { style_stack.pop(); }
+                if !style_stack.is_empty() {
+                    style_stack.pop();
+                }
             } else {
                 // push style for this tag
                 let st = style_for_tag(tagname);
@@ -213,7 +231,6 @@ fn parse_label_to_spans(s: &str) -> Vec<(String, Style)> {
     parts
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,15 +238,16 @@ mod tests {
     #[test]
     fn test_remove_plain_prefix_compound() {
         // Simulates label "car alarm <hw>car alarm</hw> <pos>noun</pos>"
-        let hw_style  = Style::default().fg(ratatui::style::Color::Cyan)
+        let hw_style = Style::default()
+            .fg(ratatui::style::Color::Cyan)
             .add_modifier(ratatui::style::Modifier::BOLD);
         let pos_style = Style::default().fg(ratatui::style::Color::Yellow);
         let tokens = vec![
-            ("car".to_string(),   Style::default()),
+            ("car".to_string(), Style::default()),
             ("alarm".to_string(), Style::default()),
-            ("car".to_string(),   hw_style),
+            ("car".to_string(), hw_style),
             ("alarm".to_string(), hw_style),
-            ("noun".to_string(),  pos_style),
+            ("noun".to_string(), pos_style),
         ];
         let result = remove_plain_prefix(tokens);
         assert_eq!(result.len(), 3, "plain prefix should be removed");
@@ -248,11 +266,15 @@ mod tests {
     #[test]
     fn test_remove_plain_prefix_no_plain_prefix() {
         // Label that starts directly with a styled token — no change
-        let hw_style = Style::default().fg(ratatui::style::Color::Cyan)
+        let hw_style = Style::default()
+            .fg(ratatui::style::Color::Cyan)
             .add_modifier(ratatui::style::Modifier::BOLD);
         let tokens = vec![
             ("run".to_string(), hw_style),
-            ("verb".to_string(), Style::default().fg(ratatui::style::Color::Yellow)),
+            (
+                "verb".to_string(),
+                Style::default().fg(ratatui::style::Color::Yellow),
+            ),
         ];
         let result = remove_plain_prefix(tokens.clone());
         assert_eq!(result, tokens);

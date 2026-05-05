@@ -37,9 +37,17 @@ fn test_round_trip_single() {
 fn test_round_trip_many() {
     let dir = tempdir().unwrap();
     let pairs: Vec<(Vec<u8>, Vec<u8>)> = (0u32..100)
-        .map(|i| (format!("key{i}").into_bytes(), format!("value{i}").into_bytes()))
+        .map(|i| {
+            (
+                format!("key{i}").into_bytes(),
+                format!("value{i}").into_bytes(),
+            )
+        })
         .collect();
-    let bpairs: Vec<(&[u8], &[u8])> = pairs.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+    let bpairs: Vec<(&[u8], &[u8])> = pairs
+        .iter()
+        .map(|(k, v)| (k.as_slice(), v.as_slice()))
+        .collect();
     let path = build_cdb(dir.path(), &bpairs);
 
     let reader = CDBReader::open(&path).unwrap();
@@ -77,15 +85,12 @@ fn test_binary_keys_and_values() {
 #[test]
 fn test_iteration() {
     let dir = tempdir().unwrap();
-    let path = build_cdb(dir.path(), &[
-        (b"a", b"1"),
-        (b"b", b"2"),
-        (b"c", b"3"),
-    ]);
+    let path = build_cdb(dir.path(), &[(b"a", b"1"), (b"b", b"2"), (b"c", b"3")]);
     let reader = CDBReader::open(&path).unwrap();
     let items = reader.iter_items().collect::<Vec<_>>();
     // All three keys must appear (order not guaranteed)
-    let keys: std::collections::HashSet<Vec<u8>> = items.iter()
+    let keys: std::collections::HashSet<Vec<u8>> = items
+        .iter()
         .map(|(k, _v): &(Vec<u8>, Vec<u8>)| k.clone())
         .collect();
     assert!(keys.contains(b"a".as_ref()));
@@ -99,14 +104,27 @@ fn test_hash_collision_resilience() {
     // Pack enough keys to force hash-table chaining
     let dir = tempdir().unwrap();
     let pairs: Vec<(Vec<u8>, Vec<u8>)> = (0u32..300)
-        .map(|i| (format!("k{i:04}").into_bytes(), format!("v{i}").into_bytes()))
+        .map(|i| {
+            (
+                format!("k{i:04}").into_bytes(),
+                format!("v{i}").into_bytes(),
+            )
+        })
         .collect();
-    let bpairs: Vec<(&[u8], &[u8])> = pairs.iter().map(|(k, v)| (k.as_slice(), v.as_slice())).collect();
+    let bpairs: Vec<(&[u8], &[u8])> = pairs
+        .iter()
+        .map(|(k, v)| (k.as_slice(), v.as_slice()))
+        .collect();
     let path = build_cdb(dir.path(), &bpairs);
 
     let reader = CDBReader::open(&path).unwrap();
     for (k, v) in &pairs {
-        assert_eq!(reader.get(k), Some(v.clone()), "missing key {:?}", std::str::from_utf8(k).unwrap());
+        assert_eq!(
+            reader.get(k),
+            Some(v.clone()),
+            "missing key {:?}",
+            std::str::from_utf8(k).unwrap()
+        );
     }
 }
 

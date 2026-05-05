@@ -1,7 +1,9 @@
 //! Search layer: incremental prefix-search and Tantivy full-text search.
 
-pub mod incremental;
 pub mod fulltext;
+pub mod incremental;
 
-pub use incremental::{IncrementalMaker, IncrementalSearcher, IncrementalResult, IncrementalError, normalize_index_key};
-pub use fulltext::{FulltextMaker, FulltextSearcher, FulltextResult, FulltextError};
+pub use fulltext::{FulltextError, FulltextMaker, FulltextResult, FulltextSearcher};
+pub use incremental::{
+    normalize_index_key, IncrementalError, IncrementalMaker, IncrementalResult, IncrementalSearcher,
+};
