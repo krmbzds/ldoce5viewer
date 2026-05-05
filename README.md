@@ -93,3 +93,61 @@ python -c "from PySide6.QtCore import QCoreApplication; print(QCoreApplication.l
 pip install PySide6-Addons
 ```
 
+## Building macOS .app and DMG
+
+Build the app (.app via PyInstaller)
+
+```bash
+# Use the active python (e.g. from mise)
+PYTHON="$(which python)"
+
+# Clean & regenerate ui/resources
+make clean
+make qtui qtresource
+
+# Build the .app using the active Python
+make PYTHON="$PYTHON" build
+```
+
+Create a compressed DMG from the built .app
+
+```bash
+# From repo root; adjust APPNAME if you changed the bundle name
+APP="dist/LDOCE5 Viewer.app"
+DIST="dist"
+TMP="$DIST/tmp.dmg"
+STAGE="$DIST/dmg_staging"
+
+# Prepare staging and copy app
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+cp -R "$APP" "$STAGE/"
+
+# Create temporary read-write image and convert to compressed read-only DMG
+hdiutil create -srcfolder "$STAGE" -volname "LDOCE5 Viewer" -fs HFS+ -format UDRO "$TMP"
+hdiutil convert "$TMP" -format UDZO -imagekey zlib-level=9 -o "$DIST/LDOCE5 Viewer.dmg"
+
+# Cleanup
+rm -f "$TMP"
+rm -rf "$STAGE"
+
+# Show result
+ls -lh "$DIST/LDOCE5 Viewer.dmg"
+```
+
+Notes
+- If you prefer a prettier DMG (background image, Applications link) install `create-dmg` (Homebrew) and replace the `hdiutil` step with the `create-dmg` invocation.
+- When building the .app, ensure `PyInstaller` and `PySide6` are installed into the same Python environment you use for `make` (e.g. via `python -m pip install PySide6 pyinstaller`).
+
+## Codesigning & Notarization (optional, required for distribution)
+
+To distribute outside your machine and avoid Gatekeeper warnings, codesign and notarize the app:
+
+```bash
+# Codesign (replace identity)
+codesign --deep --force --options runtime --sign "Developer ID Application: Your Name (TEAMID)" "dist/LDOCE5 Viewer.app"
+
+# Create DMG (see previous section) then notarize with notarytool (xcrun)
+xcrun notarytool submit "dist/LDOCE5 Viewer.dmg" --keychain-profile "AC_PASSWORD_PROFILE" --wait
+xcrun stapler staple "dist/LDOCE5 Viewer.dmg"
+```
