@@ -1,7 +1,5 @@
 """Main window"""
 
-import os
-import re
 import sys
 from difflib import SequenceMatcher
 from functools import partial
@@ -622,46 +620,6 @@ class MainWindow(QMainWindow):
 
         self._getAudioData(path, showSaveDialog)
 
-    def copyToAnki(self):
-        audio_urls = []
-
-        anki_dir = "anki"
-        if not os.path.exists(anki_dir):
-            os.mkdir(anki_dir)
-
-        anki_media_dir = os.path.join(anki_dir, "collection.media")
-        if not os.path.exists(anki_media_dir):
-            os.mkdir(anki_media_dir)
-
-        with open(os.path.join(anki_dir, "anki.txt"), "a", encoding="utf-8") as f:
-            header, meaning = self._ui.webView.copyToAnki
-
-            audio_urls.extend(re.findall(r'href="audio://([^\"]*\.mp3)"', header))
-            audio_urls.extend(re.findall(r'href="audio://([^\"]*\.mp3)"', meaning))
-
-            header = re.sub(
-                r'<a class="audio" href="audio:///(?:gb_hwd_pron/|us_hwd_pron/)([^/\"]*?\.mp3)" title="([^\"]+)"><img src="[^\"]+"></a>',
-                r'<a class="audio" title="\\2">[sound:\\1]</a>',
-                header,
-            )
-            meaning = re.sub(
-                r'<a class="audio" href="audio:///exa_pron/([^/\"]+\.mp3)" title="Play"><img src="static:///images/speaker_eg.png"></a>',
-                r'<a class="audio" title="Play">[sound:\\1]</a>',
-                meaning,
-            )
-
-            line = header + "\t" + meaning + "\n"
-            # write as UTF-8 text
-            f.write(line)
-
-        def saveAudioFile(data, filename):
-            file = open(os.path.join(anki_media_dir, filename), "wb")
-            file.write(data)
-            file.close()
-
-        for path in audio_urls:
-            self._getAudioData(path, saveAudioFile)
-
     def _onWebViewLinkClicked(self, url):
         scheme = url.scheme()
         if scheme == "audio":
@@ -1126,7 +1084,6 @@ class MainWindow(QMainWindow):
         _set_icon(ui.actionFindNext, "go-down")
         _set_icon(ui.actionFindPrev, "go-up")
         _set_icon(ui.actionCloseInspector, "window-close")
-        _set_icon(ui.webView.actionCopyToAnki, "anki")
 
         ui.actionSearchDefinitions.setIcon(QIcon())
         ui.actionSearchExamples.setIcon(QIcon())
@@ -1276,7 +1233,6 @@ class MainWindow(QMainWindow):
         act_conn(ui.actionAdvancedSearch, self._onAdvancedSearch)
         act_conn(ui.webView.actionSearchText, self.searchSelectedText)
         act_conn(ui.webView.actionDownloadAudio, self.downloadSelectedAudio)
-        act_conn(ui.webView.actionCopyToAnki, self.copyToAnki)
         act_conn(ui.webView.actionSearchText, self.searchSelectedText)
         act_conn(ui.actionZoomIn, partial(self.setZoom, 1, relative=True))
         act_conn(ui.actionZoomOut, partial(self.setZoom, -1, relative=True))

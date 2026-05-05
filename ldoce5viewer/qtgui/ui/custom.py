@@ -153,13 +153,34 @@ class HtmlListWidget(QListWidget):
             doc.drawContents(painter)
 
         def sizeHint(self, option, index):
+            """
+            Estimate item height quickly using font metrics and a plain-text
+            approximation of the HTML content to avoid expensive QTextDocument
+            layout during list sizing. Cache the result per-delegate.
+            """
             s = self._item_size
             if not s:
-                doc = self._doc
-                doc.setDefaultFont(option.font)
-                doc.setHtml('<body>MNmn012<span class="p">012</span></body>')
-                height = doc.size().height() + self.MARGIN_V * 2
-                s = self._item_size = QSize(0, height)
+                try:
+                    # Get plain text by stripping simple HTML tags
+                    import re
+
+                    text_html = index.data(DisplayRole) or ""
+                    text_plain = re.sub(r"<[^>]+>", "", text_html)
+
+                    fm = option.fontMetrics
+                    avg_char_w = max(1, fm.averageCharWidth())
+                    available_width = max(80, option.rect.width() - self.MARGIN_H * 2)
+                    chars_per_line = max(20, int(available_width / avg_char_w))
+                    import math
+
+                    lines = max(1, int(math.ceil(len(text_plain) / chars_per_line)))
+                    # Ensure at least a couple of lines to avoid clipping
+                    lines = max(lines, 2)
+                    height = fm.lineSpacing() * lines + self.MARGIN_V * 2
+                    s = self._item_size = QSize(0, int(height))
+                except Exception:
+                    # Fallback conservative estimate
+                    s = self._item_size = QSize(0, 48)
             return s
 
         def setStyleSheet(self, s):
@@ -206,7 +227,6 @@ class WebView(QWebEngineView):
         self.page().selectionChanged.connect(self.__onSelectionChanged)
         self.__onSelectionChanged()
         self._actionDownloadAudio = QAction("Download mp3", self)
-        self._actionCopyToAnki = QAction("Anki", self)
 
     def _copyAsPlainText(self):
         text = self.selectedText().strip()
@@ -228,19 +248,18 @@ class WebView(QWebEngineView):
     def audioUrlToDownload(self):
         return self._audioUrlToDownload
 
-    @property
-    def actionCopyToAnki(self):
-        return self._actionCopyToAnki
-
-    @property
-    def copyToAnki(self):
-        return self._copyToAnki
-
     def __onSelectionChanged(self):
         text = self.selectedText()
         self._actionCopyPlain.setEnabled(bool(text))
 
     def contextMenuEvent(self, event):
+        # Remember the position where the context menu was invoked so actions
+        # (like Anki export) can reference the correct DOM element later.
+        try:
+            self._last_context_pos = event.globalPos()
+        except Exception:
+            self._last_context_pos = None
+
         page = self.page()
         menu = self.createStandardContextMenu()
         actions = menu.actions()
@@ -263,9 +282,11 @@ class WebView(QWebEngineView):
             # Fallback for QWebEngine: try hitTestContent and run JavaScript to
             # find the closest .head and enclosing block element at the event point.
             try:
-                hit = page.hitTestContent(event.pos())
+                # Call hitTestContent for its side effects if any, but we don't
+                # need the returned object here.
+                page.hitTestContent(event.pos())
             except Exception:
-                hit = None
+                pass
 
             # Coordinates: event.pos() is widget coordinates. For many pages this
             # maps well to document.elementFromPoint, but devicePixelRatio can
@@ -276,7 +297,8 @@ class WebView(QWebEngineView):
 
             js = (
                 "(function(){"
-                "var el = document.elementFromPoint(%d, %d);"
+                "var ratio = window.devicePixelRatio || 1;"
+                "var el = document.elementFromPoint(%d/ratio, %d/ratio);"
                 "if(!el) return ['', ''];"
                 "var head = el.closest('.head');"
                 "var header = head ? head.outerHTML : '';"
@@ -303,6 +325,7 @@ class WebView(QWebEngineView):
 
                 while "value" not in result and time() - start < timeout:
                     QApplication.processEvents()
+
                 if "value" in result and result["value"]:
                     header, meaning = result["value"]
                     if header is None:
@@ -316,10 +339,7 @@ class WebView(QWebEngineView):
                 except Exception:
                     meaning = ""
 
-        self._copyToAnki = (header, meaning)
-        menu.insertAction(actions[0] if actions else None, self.actionCopyToAnki)
-
-        # inserts the "Download audio" action
+            # inserts the "Download audio" action
         # FIXME: when possible implement similar fallback JS extraction for link at pos
         # try:
         #     frame = page.frameAt(event.pos())
