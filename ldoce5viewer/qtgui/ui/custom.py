@@ -245,20 +245,90 @@ class WebView(QWebEngineView):
         menu = self.createStandardContextMenu()
         actions = menu.actions()
 
-        # inserts the "Copy to Anki" action
-        # NOTE: frameAt/hitTestContent/findFirstElement were Qt WebKit APIs removed in
-        # Qt5+ WebEngine. Header and meaning context is not available synchronously in
-        # QtWebEngine, so we insert the action with empty context.
-        self._copyToAnki = ("", "")
+        # Try WebKit-style APIs first (older versions); if not available, fall back
+        # to QWebEngine's APIs + a small JavaScript snippet to extract surrounding HTML.
+        header = ""
+        meaning = ""
+        try:
+            # Old API (may not exist on QWebEnginePage)
+            frame = page.frameAt(event.pos())
+            hit_test_result = frame.hitTestContent(event.pos())
+
+            header = frame.findFirstElement(".head").toOuterXml()
+            header = header.replace("\n", "")
+
+            meaning = hit_test_result.enclosingBlockElement().toOuterXml()
+            meaning = meaning.replace("\n", "")
+        except Exception:
+            # Fallback for QWebEngine: try hitTestContent and run JavaScript to
+            # find the closest .head and enclosing block element at the event point.
+            try:
+                hit = page.hitTestContent(event.pos())
+            except Exception:
+                hit = None
+
+            # Coordinates: event.pos() is widget coordinates. For many pages this
+            # maps well to document.elementFromPoint, but devicePixelRatio can
+            # affect accuracy. Use the raw widget coords as a best-effort.
+            p = event.pos()
+            x = int(p.x())
+            y = int(p.y())
+
+            js = (
+                "(function(){"
+                "var el = document.elementFromPoint(%d, %d);"
+                "if(!el) return ['', ''];"
+                "var head = el.closest('.head');"
+                "var header = head ? head.outerHTML : '';"
+                "var block = el.closest('p,div,li,section,article') || el;"
+                "var meaning = block ? block.outerHTML : '';"
+                "return [header, meaning];"
+                "})()"
+            ) % (x, y)
+
+            # Run JS and wait briefly for result (runJavaScript is async)
+            result = {}
+
+            def _js_cb(res):
+                result["value"] = res
+
+            try:
+                page.runJavaScript(js, _js_cb)
+                # process events until callback sets result or timeout
+                from time import time
+
+                start = time()
+                timeout = 1.0
+                from PySide6.QtWidgets import QApplication
+
+                while "value" not in result and time() - start < timeout:
+                    QApplication.processEvents()
+                if "value" in result and result["value"]:
+                    header, meaning = result["value"]
+                    if header is None:
+                        header = ""
+                    if meaning is None:
+                        meaning = ""
+            except Exception:
+                # last-resort: use selectedText or empty strings
+                try:
+                    meaning = page.selectedText()
+                except Exception:
+                    meaning = ""
+
+        self._copyToAnki = (header, meaning)
         menu.insertAction(actions[0] if actions else None, self.actionCopyToAnki)
 
         # inserts the "Download audio" action
-        # FIXME
-        # frame = page.frameAt(event.pos())
-        # hit_test_result = frame.hitTestContent(event.pos())
-        # if hit_test_result.linkUrl().scheme() == "audio":
-        #     self._audioUrlToDownload = hit_test_result.linkUrl()
-        #     menu.insertAction(actions[0] if actions else None, self.actionDownloadAudio)
+        # FIXME: when possible implement similar fallback JS extraction for link at pos
+        # try:
+        #     frame = page.frameAt(event.pos())
+        #     hit_test_result = frame.hitTestContent(event.pos())
+        #     if hit_test_result.linkUrl().scheme() == "audio":
+        #         self._audioUrlToDownload = hit_test_result.linkUrl()
+        #         menu.insertAction(actions[0] if actions else None, self.actionDownloadAudio)
+        # except Exception:
+        #     pass
 
         # Insert the "Search for ..." action
         text = page.selectedText().strip().lower()
@@ -275,16 +345,6 @@ class WebView(QWebEngineView):
                 menu.removeAction(action_copy)
         except Exception:
             pass
-
-        # Inserts a separator before "Inspect Element"
-        # try:
-        #     action_inspector = page.action(QWebEnginePage.InspectElement)
-        #     pos = actions.index(action_inspector)
-        # except:
-        #     pass
-        # else:
-        #     if pos > 0 and not actions[pos - 1].isSeparator():
-        #         menu.insertSeparator(action_inspector)
 
         # display the context menu
         menu.exec_(event.globalPos())
