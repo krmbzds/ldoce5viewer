@@ -152,11 +152,35 @@ fn extract_items_from_entry(
         }
     }
 
-    // headword item
+    let hwd_label = format!("<h>{}</h>", hwdlabel.clone());
     let path_root = format!("/fs/{}", root_id_short);
+
+    /// Return the path to `elem` by looking at its own `id` first, then
+    /// walking up to the nearest ancestor that has one.
+    fn elem_path(elem: roxmltree::Node, root_id_short: &str, path_root: &str) -> String {
+        let pid = {
+            let mut n = elem;
+            loop {
+                if let Some(id) = n.attribute("id") {
+                    break id.to_owned();
+                }
+                match n.parent() {
+                    Some(p) => n = p,
+                    None => break String::new(),
+                }
+            }
+        };
+        if pid.is_empty() {
+            path_root.to_owned()
+        } else {
+            format!("/fs/{}#{}", root_id_short, shorten_id(&pid))
+        }
+    }
+
+    // headword item (hm)
     let item = Item {
         itemtype: "hm".to_string(),
-        label: format!("<h>{}</h>", hwdlabel.clone()),
+        label: hwd_label.clone(),
         path: path_root.clone(),
         content: collect_text(root, &exclude),
         sortkey: hwd_base.clone(),
@@ -165,7 +189,326 @@ fn extract_items_from_entry(
     };
     items.push(item);
 
-    // Definitions (DEF) -> d
+    // ── Headword inflection variants (hv) ──────────────────────────────────
+    // HWD/INFLX — different inflected forms of the headword
+    if let Some(h) = head {
+        if let Some(hwd_elem) = h
+            .children()
+            .find(|n| n.is_element() && n.tag_name().name() == "HWD")
+        {
+            for inflx in hwd_elem
+                .descendants()
+                .filter(|n| n.is_element() && n.tag_name().name() == "INFLX")
+            {
+                let plain = collect_text(inflx, &exclude);
+                if plain.is_empty() || plain == hwd_base {
+                    continue;
+                }
+                let inflx_label = format!(
+                    "<h><v>{}</v> &rarr; {}</h>",
+                    plain,
+                    hwdlabel.clone()
+                );
+                items.push(Item {
+                    itemtype: "hv".to_string(),
+                    label: inflx_label,
+                    path: path_root.clone(),
+                    content: plain.clone(),
+                    sortkey: plain.clone(),
+                    asfilter: String::new(),
+                    prio: 2,
+                });
+            }
+        }
+    }
+
+    // ── Phrasal verbs (hp) ─────────────────────────────────────────────────
+    for phrvb in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "PhrVbEntry")
+    {
+        let phrvbhwd = phrvb
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "PHRVBHWD");
+        if let Some(phrvbhwd) = phrvbhwd {
+            let plain = collect_text(phrvbhwd, &exclude);
+            if plain.is_empty() {
+                continue;
+            }
+            let path = elem_path(phrvb, &root_id_short, &path_root);
+            let label =
+                format!("<h><pv>{}</pv> <p>phrasal verb</p></h>", plain);
+            items.push(Item {
+                itemtype: "hp".to_string(),
+                label,
+                path,
+                content: plain.clone(),
+                sortkey: plain.clone(),
+                asfilter: String::new(),
+                prio: 1,
+            });
+        }
+    }
+
+    // ── Run-on derivatives (hm) ────────────────────────────────────────────
+    for runon in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "RunOn")
+    {
+        let deriv = runon
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "DERIV");
+        if let Some(deriv) = deriv {
+            let base_elem = deriv
+                .descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "BASE");
+            if let Some(base_elem) = base_elem {
+                let mut plain = collect_text(base_elem, &exclude);
+                // strip stress markers
+                plain = plain.replace('\u{02c8}', "").replace('\u{02cc}', "");
+                if plain.is_empty() {
+                    continue;
+                }
+                let poslist: Vec<String> = runon
+                    .descendants()
+                    .filter(|n| n.is_element() && n.tag_name().name() == "POS")
+                    .filter_map(|n| n.text().map(|s| s.to_string()))
+                    .collect();
+                let pos_str = poslist.join(", ");
+                let label = if pos_str.is_empty() {
+                    format!("<h><n>{}</n></h>", plain)
+                } else {
+                    format!("<h><n>{}</n> <p>{}</p></h>", plain, pos_str)
+                };
+                let path = elem_path(deriv, &root_id_short, &path_root);
+                items.push(Item {
+                    itemtype: "hm".to_string(),
+                    label,
+                    path,
+                    content: plain.clone(),
+                    sortkey: plain.clone(),
+                    asfilter: String::new(),
+                    prio: 1,
+                });
+            }
+        }
+    }
+
+    // ── Lexical units / phrases (p, pl) ────────────────────────────────────
+    for lexunit in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "LEXUNIT")
+    {
+        if lexunit.attribute("id").is_none() {
+            continue;
+        }
+        let plain = collect_text(lexunit, &exclude);
+        if plain.is_empty() {
+            continue;
+        }
+        let path = elem_path(lexunit, &root_id_short, &path_root);
+        let label = format!("<l><o>{}</o> ({})</l>", plain, hwdlabel.clone());
+        items.push(Item {
+            itemtype: "pl".to_string(),
+            label,
+            path,
+            content: plain.clone(),
+            sortkey: plain.clone(),
+            asfilter: String::new(),
+            prio: 9,
+        });
+    }
+
+    // ── PROPFORM / PROPFORMPREP (p) ────────────────────────────────────────
+    for tag_name in &["PROPFORM", "PROPFORMPREP"] {
+        for elem in root
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == *tag_name)
+        {
+            if elem.attribute("id").is_none() {
+                continue;
+            }
+            let plain = collect_text(elem, &exclude);
+            if plain.is_empty() {
+                continue;
+            }
+            let path = elem_path(elem, &root_id_short, &path_root);
+            let label =
+                format!("<c><o>{}</o> ({})</c>", plain, hwdlabel.clone());
+            items.push(Item {
+                itemtype: "p".to_string(),
+                label,
+                path,
+                content: plain.clone(),
+                sortkey: plain.clone(),
+                asfilter: String::new(),
+                prio: 10,
+            });
+        }
+    }
+
+    // ── Collocations: COLLO / COLLOC (p) ──────────────────────────────────
+    for tag_name in &["COLLO", "COLLOC"] {
+        for elem in root
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == *tag_name)
+        {
+            if elem.attribute("id").is_none() {
+                continue;
+            }
+            let mut plain = collect_text(elem, &exclude);
+            // remove leading article
+            if plain.starts_with("a ") {
+                plain = plain[2..].to_owned();
+            } else if plain.starts_with("an ") {
+                plain = plain[3..].to_owned();
+            }
+            if plain.is_empty() {
+                continue;
+            }
+            let path = elem_path(elem, &root_id_short, &path_root);
+            let label =
+                format!("<c><o>{}</o> ({})</c>", plain, hwdlabel.clone());
+            items.push(Item {
+                itemtype: "p".to_string(),
+                label,
+                path,
+                content: plain.clone(),
+                sortkey: plain.clone(),
+                asfilter: String::new(),
+                prio: 10,
+            });
+        }
+    }
+
+    // ── Collocate structured entries (p + e) ───────────────────────────────
+    // Each Collocate gives a collocation heading and its ColloExa examples.
+    for collocate in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "Collocate")
+    {
+        if collocate.attribute("id").is_none() {
+            continue;
+        }
+        // Build collocation title from COLLOC + LEXVAR + ORTHVAR children
+        let colloc_texts: Vec<String> = collocate
+            .children()
+            .filter(|n| {
+                n.is_element()
+                    && matches!(
+                        n.tag_name().name(),
+                        "COLLOC" | "LEXVAR" | "ORTHVAR"
+                    )
+            })
+            .map(|n| collect_text(n, &exclude))
+            .filter(|s| !s.is_empty())
+            .collect();
+        if colloc_texts.is_empty() {
+            continue;
+        }
+        let colloc_title = colloc_texts.join(", ");
+
+        // Index per-ColloExa example sentences
+        for collexa in collocate
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "ColloExa")
+        {
+            let base = collexa
+                .descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "BASE");
+            if let Some(base) = base {
+                // Include COLLOINEXA text inside the example
+                let mut ex_parts: Vec<String> = Vec::new();
+                if let Some(t) = base.text() {
+                    ex_parts.push(t.to_owned());
+                }
+                for child in base.children() {
+                    let cn = child.tag_name().name();
+                    if cn == "COLLOINEXA" {
+                        ex_parts.push(collect_text(child, &exclude));
+                    }
+                    if let Some(t) = child.tail() {
+                        ex_parts.push(t.to_owned());
+                    }
+                }
+                let ex_text = collapse_space(&ex_parts.join(" "));
+                if ex_text.is_empty() {
+                    continue;
+                }
+                let path = elem_path(collocate, &root_id_short, &path_root);
+                let ex_label = format!(
+                    "{} &mdash; <b>{}</b>",
+                    hwd_label,
+                    colloc_title
+                );
+                items.push(Item {
+                    itemtype: "e".to_string(),
+                    label: ex_label,
+                    path,
+                    content: ex_text,
+                    sortkey: hwd_base.clone(),
+                    asfilter: String::new(),
+                    prio: 20,
+                });
+            }
+        }
+    }
+
+    // ── Thesaurus exponents (e, d) ─────────────────────────────────────────
+    for exponent in root
+        .descendants()
+        .filter(|n| n.is_element() && n.tag_name().name() == "Exponent")
+    {
+        if exponent.attribute("id").is_none() {
+            continue;
+        }
+        let path = elem_path(exponent, &root_id_short, &path_root);
+
+        // ThesExa examples
+        for thesexa in exponent
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "THESEXA")
+        {
+            if let Some(base) = thesexa
+                .descendants()
+                .find(|n| n.is_element() && n.tag_name().name() == "BASE")
+            {
+                let text = collect_text(base, &exclude);
+                if !text.is_empty() {
+                    items.push(Item {
+                        itemtype: "e".to_string(),
+                        label: hwd_label.clone(),
+                        path: path.clone(),
+                        content: text,
+                        sortkey: hwd_base.clone(),
+                        asfilter: String::new(),
+                        prio: 20,
+                    });
+                }
+            }
+        }
+
+        // DEF within exponent
+        for def in exponent
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "DEF")
+        {
+            let text = collect_text(def, &exclude);
+            if !text.is_empty() {
+                items.push(Item {
+                    itemtype: "d".to_string(),
+                    label: hwd_label.clone(),
+                    path: path.clone(),
+                    content: text,
+                    sortkey: hwd_base.clone(),
+                    asfilter: String::new(),
+                    prio: 30,
+                });
+            }
+        }
+    }
+
+    // ── Definitions (DEF) -> d ─────────────────────────────────────────────
     for def in root
         .descendants()
         .filter(|n| n.is_element() && n.tag_name().name() == "DEF")
@@ -174,24 +517,10 @@ fn extract_items_from_entry(
         if text.is_empty() {
             continue;
         }
-        // find nearest ancestor with id
-        let mut anc = def;
-        while anc.attribute("id").is_none() {
-            if let Some(p) = anc.parent() {
-                anc = p;
-            } else {
-                break;
-            }
-        }
-        let pid = anc.attribute("id").unwrap_or("");
-        let fullpath = if pid.is_empty() {
-            path_root.clone()
-        } else {
-            format!("/fs/{}#{}", root_id_short, shorten_id(pid))
-        };
+        let fullpath = elem_path(def, &root_id_short, &path_root);
         items.push(Item {
             itemtype: "d".to_string(),
-            label: format!("<h>{}</h>", hwdlabel.clone()),
+            label: hwd_label.clone(),
             path: fullpath,
             content: text,
             sortkey: hwd_base.clone(),
@@ -200,7 +529,7 @@ fn extract_items_from_entry(
         });
     }
 
-    // Examples
+    // ── Examples (EXAMPLE/BASE) -> e ──────────────────────────────────────
     for ex in root
         .descendants()
         .filter(|n| n.is_element() && n.tag_name().name() == "EXAMPLE")
@@ -209,33 +538,57 @@ fn extract_items_from_entry(
             .descendants()
             .find(|n| n.is_element() && n.tag_name().name() == "BASE")
         {
-            let text = collect_text(base, &exclude);
+            // Collect text including COLLOINEXA spans
+            let mut parts: Vec<String> = Vec::new();
+            if let Some(t) = base.text() {
+                parts.push(t.to_owned());
+            }
+            for child in base.children() {
+                parts.push(collect_text(child, &exclude));
+                if let Some(t) = child.tail() {
+                    parts.push(t.to_owned());
+                }
+            }
+            let text = collapse_space(&parts.join(" "));
             if text.is_empty() {
                 continue;
             }
-            let mut anc = ex;
-            while anc.attribute("id").is_none() {
-                if let Some(p) = anc.parent() {
-                    anc = p;
-                } else {
-                    break;
-                }
-            }
-            let pid = anc.attribute("id").unwrap_or("");
-            let fullpath = if pid.is_empty() {
-                path_root.clone()
-            } else {
-                format!("/fs/{}#{}", root_id_short, shorten_id(pid))
-            };
+            // Use the EXAMPLE element's own id if present; otherwise walk up.
+            let fullpath = elem_path(ex, &root_id_short, &path_root);
             items.push(Item {
                 itemtype: "e".to_string(),
-                label: format!("<h>{}</h>", hwdlabel.clone()),
-                path: fullpath,
+                label: hwd_label.clone(),
+                path: fullpath.clone(),
                 content: text,
                 sortkey: hwd_base.clone(),
                 asfilter: String::new(),
                 prio: 20,
             });
+
+            // Per-collocation sub-entries: COLLOINEXA within the example
+            let colloinexa_texts: Vec<String> = base
+                .descendants()
+                .filter(|n| n.is_element() && n.tag_name().name() == "COLLOINEXA")
+                .map(|n| collect_text(n, &exclude))
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !colloinexa_texts.is_empty() {
+                let coplain = colloinexa_texts.join(" ");
+                let colabel = format!(
+                    "<c><o>{}</o> ({})</c>",
+                    colloinexa_texts.join(" &hellip; "),
+                    hwdlabel.clone()
+                );
+                items.push(Item {
+                    itemtype: "p".to_string(),
+                    label: colabel,
+                    path: fullpath,
+                    content: coplain.clone(),
+                    sortkey: coplain,
+                    asfilter: String::new(),
+                    prio: 15,
+                });
+            }
         }
     }
 

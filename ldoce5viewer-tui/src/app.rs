@@ -484,6 +484,12 @@ impl App {
                             col = block.indent as usize * 2;
                         }
                         crate::content::Inline::Image { .. } => {}
+                        crate::content::Inline::Badge { text } => {
+                            col += text.chars().count() + 3; // " [" + text + "]"
+                        }
+                        crate::content::Inline::Signpost { text } => {
+                            col += text.chars().count() + 6; // " ■ " + text + " ■ "
+                        }
                     }
                 }
             }
@@ -614,6 +620,8 @@ impl App {
                         crate::content::Inline::Text(t, _) => Some(t.as_str()),
                         crate::content::Inline::Headword(t) => Some(t.as_str()),
                         crate::content::Inline::Prefix(p, _) => Some(p.as_str()),
+                        crate::content::Inline::Badge { text } => Some(text.as_str()),
+                        crate::content::Inline::Signpost { text } => Some(text.as_str()),
                         _ => None,
                     })
                     .collect::<Vec<_>>()
@@ -923,14 +931,17 @@ mod tests {
             Block {
                 indent: 0,
                 inlines: vec![Inline::Text("hello world".into(), Style::default())],
+                ..Block::default()
             },
             Block {
                 indent: 0,
                 inlines: vec![Inline::Text("foo bar".into(), Style::default())],
+                ..Block::default()
             },
             Block {
                 indent: 0,
                 inlines: vec![Inline::Text("hello again".into(), Style::default())],
+                ..Block::default()
             },
         ]);
         app.find_in_page("hello");

@@ -178,6 +178,8 @@ fn build_ratatui_text<'t>(
             .filter_map(|i| match i {
                 Inline::Text(t, _) => Some(t.as_str()),
                 Inline::Headword(t) => Some(t.as_str()),
+                Inline::Badge { text } => Some(text.as_str()),
+                Inline::Signpost { text } => Some(text.as_str()),
                 _ => None,
             })
             .collect::<Vec<_>>()

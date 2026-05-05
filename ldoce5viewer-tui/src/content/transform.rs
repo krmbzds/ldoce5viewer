@@ -37,6 +37,10 @@ pub enum Inline {
     Link { text: String, target: String },
     /// A line break within a block.
     LineBreak,
+    /// A frequency/corpus badge: S1, W2, AC etc.  Rendered as `[text]`.
+    Badge { text: String },
+    /// A signpost label — rendered with a visual box to indicate topic.
+    Signpost { text: String },
 }
 
 /// A block of content (analogous to an HTML `<div>` / `<p>`).
@@ -50,6 +54,15 @@ pub struct Block {
     /// true we post-process the block by splitting it into multiple lines so
     /// each collocation / example appears on its own line.
     pub is_collo: bool,
+    /// Whether this block is a section box heading (COLLOCATIONS, THESAURUS,
+    /// GRAMMAR, etc.) — rendered with a dark header bar.
+    pub is_heading: bool,
+}
+
+impl Default for Block {
+    fn default() -> Self {
+        Block::new(0)
+    }
 }
 
 impl Block {
@@ -58,6 +71,28 @@ impl Block {
             indent,
             inlines: Vec::new(),
             is_collo: false,
+            is_heading: false,
+        }
+    }
+
+    /// Append frequency-badge text — each FREQ element gets its own Badge
+    /// inline so that "[S1] [W2]" are rendered as two separate pills.
+    fn push_badge(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.inlines.push(Inline::Badge { text: text.to_owned() });
+    }
+
+    /// Append signpost text, merging with an adjacent Signpost if present.
+    fn push_signpost(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        if let Some(Inline::Signpost { text: existing }) = self.inlines.last_mut() {
+            existing.push_str(text);
+        } else {
+            self.inlines.push(Inline::Signpost { text: text.to_owned() });
         }
     }
 
@@ -172,6 +207,29 @@ fn style_dim() -> Style {
         .fg(rgb(121, 112, 169)) // comment purple
         .add_modifier(Modifier::DIM)
 }
+/// Style for frequency/corpus badges [S1] [W2] [AC].
+/// Bright green, bold, with dark background to simulate the rounded pill on
+/// the LDOCE web page.
+fn style_badge() -> Style {
+    Style::default()
+        .fg(rgb(30, 30, 30))        // near-black text
+        .bg(rgb(80, 250, 123))      // Dracula green background
+        .add_modifier(Modifier::BOLD)
+}
+/// Style for signpost labels (e.g. "DRIVING", "CAR JOURNEY").
+fn style_signpost() -> Style {
+    Style::default()
+        .fg(rgb(248, 248, 242))     // white text
+        .bg(rgb(63, 115, 115))      // dark teal background (#3f7373)
+        .add_modifier(Modifier::BOLD)
+}
+/// Style for the text of section box headings (COLLOCATIONS, THESAURUS…).
+fn style_section_heading() -> Style {
+    Style::default()
+        .fg(rgb(40, 42, 54))        // dracula background fg (dark)
+        .bg(rgb(80, 250, 123))      // bright green fill
+        .add_modifier(Modifier::BOLD)
+}
 
 // --------------------------------------------------------------------------
 // to_ratatui_text  (ContentPage → ratatui Text)
@@ -201,6 +259,27 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
             .as_ref()
             .map(|(s, _)| s.chars().count())
             .unwrap_or(0);
+
+        // For section heading blocks (COLLOCATIONS, THESAURUS etc.) insert a
+        // blank separator line and render the heading with a colored bar.
+        if block.is_heading {
+            // Blank separator before the heading
+            lines.push(Line::from(vec![Span::raw("")]));
+            // Collect all inline text for the heading bar
+            let heading_text: String = block
+                .inlines
+                .iter()
+                .filter_map(|i| match i {
+                    Inline::Text(t, _) => Some(t.as_str()),
+                    Inline::Headword(t) => Some(t.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            let bar = format!(" ╔═ {} ═╗ ", heading_text.trim());
+            lines.push(Line::from(vec![Span::styled(bar, style_section_heading())]));
+            continue;
+        }
 
         // Build the first line (with indentation and optional prefix)
         let mut current: Vec<Span> = Vec::new();
@@ -246,6 +325,20 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
                 }
                 Inline::Prefix(_, _) => {
                     // Shouldn't appear here — we handled leading Prefix above.
+                }
+                Inline::Badge { text } => {
+                    // Render as [S1] with pill-like badge style
+                    current.push(Span::styled(
+                        format!(" [{}]", text.trim()),
+                        style_badge(),
+                    ));
+                }
+                Inline::Signpost { text } => {
+                    // Render as ■ LABEL ■ with teal background style
+                    current.push(Span::styled(
+                        format!(" ■ {} ■ ", text.trim().to_uppercase()),
+                        style_signpost(),
+                    ));
                 }
             }
         }
@@ -475,6 +568,10 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     if tag.to_lowercase().contains("collo") {
                         current_block.is_collo = true;
                     }
+                    // SECHEADING is a block-level heading tag
+                    if tag.eq_ignore_ascii_case("SECHEADING") {
+                        current_block.is_heading = true;
+                    }
                     depth += 1;
                 }
 
@@ -612,12 +709,31 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 // Check if we're inside a sensenum span
                 let is_sensenum = stack.iter().rev().any(|(t, _, _)| t == "sensenum");
 
+                // Check for frequency/corpus badge (FREQ, AC elements)
+                let is_freq = stack.iter().rev().any(|(t, _, _)| t == "FREQ" || t == "AC");
+
+                // Check for signpost element
+                let is_signpost = stack.iter().rev().any(|(t, _, _)| t == "SIGNPOST");
+
+                // Check for section heading (HEADING element inside a box)
+                let is_heading_elem = stack.iter().rev().any(|(t, _, _)| t == "HEADING");
+
                 if is_headword {
                     current_block.push_headword(text);
                 } else if is_sensenum {
                     // Convert plain number to circled unicode character
                     let circled = to_circled_number(text);
                     current_block.push_text(&format!(" {} ", circled.trim()), style);
+                } else if is_freq {
+                    // Frequency/corpus badge: render as [S1], [W2], [AC] etc.
+                    current_block.push_badge(text);
+                } else if is_signpost {
+                    // Signpost label: render with visual boxing
+                    current_block.push_signpost(text);
+                } else if is_heading_elem {
+                    // Section box heading (COLLOCATIONS, THESAURUS, …)
+                    current_block.is_heading = true;
+                    current_block.push_text(text, style_heading());
                 } else {
                     current_block.push_text(text, style);
                 }
@@ -1404,5 +1520,114 @@ mod tests {
         let page = transform_entry(b"");
         // Should not panic; may return an empty page
         let _ = page;
+    }
+
+    #[test]
+    fn test_freq_badge_rendering() {
+        // FREQ element should produce a Badge inline
+        let xml = br#"<Entry id="e.1.1.1">
+          <Head><HWD><BASE>car</BASE></HWD><FREQ>S1</FREQ><FREQ>W1</FREQ></Head>
+          <Sense id="s.1.1.1.1"><DEF>a road vehicle with an engine</DEF></Sense>
+        </Entry>"#;
+        let page = transform_entry(xml);
+        let badges: Vec<&str> = page
+            .iter()
+            .flat_map(|b| b.inlines.iter())
+            .filter_map(|i| match i {
+                Inline::Badge { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !badges.is_empty(),
+            "expected Badge inlines for FREQ elements, got none"
+        );
+        assert!(
+            badges.iter().any(|b| *b == "S1"),
+            "expected badge 'S1', got {:?}",
+            badges
+        );
+        assert!(
+            badges.iter().any(|b| *b == "W1"),
+            "expected badge 'W1', got {:?}",
+            badges
+        );
+    }
+
+    #[test]
+    fn test_badge_ratatui_rendering() {
+        // A page with a Badge should render as text containing '[S1]'
+        let xml = br#"<Entry id="e.1.1.1">
+          <Head><HWD><BASE>car</BASE></HWD><FREQ>S1</FREQ></Head>
+          <Sense id="s.1.1.1.1"><DEF>a road vehicle</DEF></Sense>
+        </Entry>"#;
+        let page = transform_entry(xml);
+        let text = to_ratatui_text(&page);
+        let all: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(all.contains("[S1]"), "rendered text should contain '[S1]'");
+    }
+
+    #[test]
+    fn test_signpost_rendering() {
+        // SIGNPOST element should produce a Signpost inline with visual boxing
+        let xml = br#"<Entry id="e.1.1.1">
+          <Head><HWD><BASE>car</BASE></HWD></Head>
+          <Sense id="s.1.1.1.1">
+            <SIGNPOST>DRIVING</SIGNPOST>
+            <DEF>to operate a car</DEF>
+          </Sense>
+        </Entry>"#;
+        let page = transform_entry(xml);
+        let signposts: Vec<&str> = page
+            .iter()
+            .flat_map(|b| b.inlines.iter())
+            .filter_map(|i| match i {
+                Inline::Signpost { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            !signposts.is_empty(),
+            "expected Signpost inlines for SIGNPOST elements"
+        );
+        assert!(
+            signposts.iter().any(|s| s.contains("DRIVING")),
+            "expected signpost containing 'DRIVING', got {:?}",
+            signposts
+        );
+    }
+
+    #[test]
+    fn test_section_heading_rendering() {
+        // HEADING element inside a ColloBox should produce an is_heading block
+        let xml = br#"<Entry id="e.1.1.1">
+          <Head><HWD><BASE>car</BASE></HWD></Head>
+          <ColloBox><HEADING>COLLOCATIONS</HEADING>
+            <ColloGram><COLLOC id="c.1.1.1.1">drive a car</COLLOC></ColloGram>
+          </ColloBox>
+        </Entry>"#;
+        let page = transform_entry(xml);
+        let heading_blocks: Vec<_> = page.iter().filter(|b| b.is_heading).collect();
+        assert!(
+            !heading_blocks.is_empty(),
+            "expected at least one is_heading block for HEADING element"
+        );
+        // The rendered output should contain the ╔═ heading bar
+        let text = to_ratatui_text(&page);
+        let all: String = text
+            .lines
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(
+            all.contains("COLLOCATIONS"),
+            "rendered heading bar should contain section title"
+        );
     }
 }
