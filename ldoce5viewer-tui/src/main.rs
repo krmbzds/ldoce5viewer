@@ -352,7 +352,7 @@ fn handle_key_content(app: &mut App, key: KeyEvent) {
                     Some((archive, name))
                 });
             if let Some((archive, name)) = path_parts {
-                let filename = format!("{name}.mp3");
+                let filename = name;
                 play_audio_file(app, &archive, &filename);
             }
         }
@@ -688,7 +688,7 @@ fn handle_mouse(app: &mut App, m: MouseEvent, term_size: ratatui::layout::Rect) 
                         Some((archive, name))
                     });
                 if let Some((archive, name)) = path_parts {
-                    let filename = format!("{name}.mp3");
+                    let filename = name;
                     play_audio_file(app, &archive, &filename);
                 }
             }
