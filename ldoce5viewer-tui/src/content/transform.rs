@@ -26,6 +26,9 @@ pub enum Inline {
     /// Headword text (semantic variant) — used to identify the main headword
     /// and to render it specially in the title of the content view.
     Headword(String),
+    /// A small prefix for a block (sense number, bullet, etc) rendered in a
+    /// short fixed-width column to the left of the block text.
+    Prefix(String, Style),
     /// An audio playback button:  `♪ <title>`.
     AudioButton { path: String, title: String },
     /// An image placeholder.
@@ -43,6 +46,10 @@ pub struct Block {
     pub indent: u8,
     /// Inlines that make up this block's content.
     pub inlines: Vec<Inline>,
+    /// Whether this block comes from a collocations/collo-related section. When
+    /// true we post-process the block by splitting it into multiple lines so
+    /// each collocation / example appears on its own line.
+    pub is_collo: bool,
 }
 
 impl Block {
@@ -50,6 +57,7 @@ impl Block {
         Block {
             indent,
             inlines: Vec::new(),
+            is_collo: false,
         }
     }
 
@@ -117,46 +125,52 @@ impl Block {
 pub type ContentPage = Vec<Block>;
 
 // --------------------------------------------------------------------------
-// Style constants
+// Style constants (Dracula Pro palette)
 // --------------------------------------------------------------------------
 
+fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color::Rgb(r, g, b)
+}
+
 fn style_default() -> Style {
-    Style::default()
+    Style::default().fg(rgb(248, 248, 242)) // white
 }
 fn style_headword() -> Style {
     Style::default()
-        .fg(Color::Cyan)
+        .fg(rgb(153, 255, 238)) // bright_cyan #99FFEE
         .add_modifier(Modifier::BOLD)
 }
 fn style_pos() -> Style {
-    Style::default().fg(Color::Yellow)
+    Style::default().fg(rgb(255, 255, 128)) // yellow #FFFF80
 }
 fn style_def() -> Style {
-    Style::default()
+    Style::default().fg(rgb(248, 248, 242)) // fg
 }
 fn style_example() -> Style {
     Style::default()
-        .fg(Color::Green)
+        .fg(rgb(138, 255, 128)) // green #8AFF80
         .add_modifier(Modifier::ITALIC)
 }
 fn style_ref() -> Style {
     Style::default()
-        .fg(Color::Blue)
+        .fg(rgb(128, 255, 234)) // cyan #80FFEA
         .add_modifier(Modifier::UNDERLINED)
 }
 fn style_label() -> Style {
-    Style::default().fg(Color::Magenta)
+    Style::default().fg(rgb(255, 128, 191)) // pink #FF80BF
 }
 fn style_heading() -> Style {
     Style::default()
-        .fg(Color::Cyan)
+        .fg(rgb(162, 255, 153)) // bright_green #A2FF99
         .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
 }
 fn style_audio() -> Style {
-    Style::default().fg(Color::Cyan)
+    Style::default().fg(rgb(128, 255, 234)) // cyan
 }
 fn style_dim() -> Style {
-    Style::default().add_modifier(Modifier::DIM)
+    Style::default()
+        .fg(rgb(121, 112, 169)) // comment purple
+        .add_modifier(Modifier::DIM)
 }
 
 // --------------------------------------------------------------------------
@@ -165,52 +179,81 @@ fn style_dim() -> Style {
 
 /// Convert a `ContentPage` into a ratatui `Text` object.
 pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
-    let lines: Vec<Line> = page
-        .iter()
-        .flat_map(|block| {
-            // Expand LineBreak inlines into multiple lines
-            let mut current: Vec<Span> = Vec::new();
-            if block.indent > 0 {
-                current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
-            }
-            let mut result_lines: Vec<Line> = Vec::new();
+    let mut lines: Vec<Line> = Vec::new();
 
-            for inline in &block.inlines {
-                match inline {
-                    Inline::Text(text, style) => {
-                        current.push(Span::styled(text.clone(), *style));
+    for block in page.iter() {
+        let indent_str = if block.indent > 0 {
+            " ".repeat(block.indent as usize * 2)
+        } else {
+            String::new()
+        };
+
+        // Detect explicit Prefix inline at the start (if present).
+        let mut start_idx = 0usize;
+        let mut prefix_opt: Option<(String, Style)> = None;
+        if let Some(Inline::Prefix(s, st)) = block.inlines.get(0) {
+            prefix_opt = Some((s.clone(), *st));
+            start_idx = 1;
+        }
+
+        // Compute prefix pad length for continuation lines
+        let prefix_pad = prefix_opt
+            .as_ref()
+            .map(|(s, _)| s.chars().count())
+            .unwrap_or(0);
+
+        // Build the first line (with indentation and optional prefix)
+        let mut current: Vec<Span> = Vec::new();
+        if !indent_str.is_empty() {
+            current.push(Span::raw(indent_str.clone()));
+        }
+        if let Some((ps, pst)) = &prefix_opt {
+            current.push(Span::styled(ps.clone(), *pst));
+        }
+
+        for inline in block.inlines.iter().skip(start_idx) {
+            match inline {
+                Inline::Text(text, style) => {
+                    current.push(Span::styled(text.clone(), *style));
+                }
+                Inline::Headword(text) => {
+                    current.push(Span::styled(text.clone(), style_headword()));
+                }
+                Inline::AudioButton { title, .. } => {
+                    let emoji = match title.as_str() {
+                        "British" => "🇬🇧",
+                        "American" => "🇺🇸",
+                        _ => "▶",
+                    };
+                    current.push(Span::styled(format!(" {emoji} "), style_audio()));
+                }
+                Inline::Image { .. } => {
+                    // Skip images in TUI
+                }
+                Inline::Link { text, .. } => {
+                    current.push(Span::styled(text.clone(), style_ref()));
+                }
+                Inline::LineBreak => {
+                    lines.push(Line::from(std::mem::take(&mut current)));
+                    // start a new current line that aligns under the text start
+                    current = Vec::new();
+                    if !indent_str.is_empty() {
+                        current.push(Span::raw(indent_str.clone()));
                     }
-                    Inline::Headword(text) => {
-                        current.push(Span::styled(text.clone(), style_headword()));
-                    }
-                    Inline::AudioButton { title, .. } => {
-                        let emoji = match title.as_str() {
-                            "British" => "🇬🇧",
-                            "American" => "🇺🇸",
-                            _ => "▶",
-                        };
-                        current.push(Span::styled(format!(" {emoji} "), style_audio()));
-                    }
-                    Inline::Image { .. } => {
-                        // Images cannot be rendered in a TUI; skip silently.
-                    }
-                    Inline::Link { text, .. } => {
-                        current.push(Span::styled(text.clone(), style_ref()));
-                    }
-                    Inline::LineBreak => {
-                        result_lines.push(Line::from(std::mem::take(&mut current)));
-                        if block.indent > 0 {
-                            current.push(Span::raw(" ".repeat(block.indent as usize * 2)));
-                        }
+                    if prefix_pad > 0 {
+                        current.push(Span::raw(" ".repeat(prefix_pad)));
                     }
                 }
+                Inline::Prefix(_, _) => {
+                    // Shouldn't appear here — we handled leading Prefix above.
+                }
             }
-            if !current.is_empty() {
-                result_lines.push(Line::from(current));
-            }
-            result_lines
-        })
-        .collect();
+        }
+
+        if !current.is_empty() {
+            lines.push(Line::from(current));
+        }
+    }
 
     Text::from(lines)
 }
@@ -404,7 +447,10 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 }
 
                 let style = style_for_tag(tag, attrs);
-                let indent = if block_tags.contains(tag.as_str()) {
+                let indent = if block_tags
+                    .iter()
+                    .any(|t| t.eq_ignore_ascii_case(tag.as_str()))
+                {
                     depth
                 } else {
                     current_block.indent
@@ -418,9 +464,17 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                         tag.clone()
                     };
 
-                if block_tags.contains(tag.as_str()) {
+                if block_tags
+                    .iter()
+                    .any(|t| t.eq_ignore_ascii_case(tag.as_str()))
+                {
                     flush(&mut page, &mut current_block);
                     current_block = Block::new(depth.min(6));
+                    // If the tag relates to collocations, mark the block so we
+                    // post-process it later (split into per-example lines).
+                    if tag.to_lowercase().contains("collo") {
+                        current_block.is_collo = true;
+                    }
                     depth += 1;
                 }
 
@@ -463,11 +517,38 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     "br" => {
                         current_block.inlines.push(Inline::LineBreak);
                     }
+                    "span" => {
+                        // If this is an example-bullet marker, start a new block so
+                        // the example appears on its own line with correct
+                        // indentation. Be resilient: class attribute may contain
+                        // multiple classes or different casing, so check contains.
+                        if let Some(cls) = attr_get(attrs, "class") {
+                            let cls = cls.to_lowercase();
+                            if cls.split_whitespace().any(|c| c == "exabullet") {
+                                // flush any currently-building block and start a new
+                                // block at the parent indentation level.
+                                flush(&mut page, &mut current_block);
+                                let indent = depth.saturating_sub(1).min(6);
+                                current_block = Block::new(indent);
+                                // If we are in a collocation context, mark the new
+                                // block so it will be split per-example later.
+                                if stack
+                                    .iter()
+                                    .any(|(t, _, _)| t.to_lowercase().contains("collo"))
+                                {
+                                    current_block.is_collo = true;
+                                }
+                            }
+                        }
+                    }
                     _ => {}
                 }
 
                 stack.push((effective_tag, style, depth));
-                if !block_tags.contains(tag.as_str()) {
+                if !block_tags
+                    .iter()
+                    .any(|t| t.eq_ignore_ascii_case(tag.as_str()))
+                {
                     depth += 1;
                 }
             }
@@ -484,7 +565,10 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                     let (_, _, d) = stack.remove(pos);
                     depth = d;
 
-                    if block_tags.contains(tag.as_str()) {
+                    if block_tags
+                        .iter()
+                        .any(|t| t.eq_ignore_ascii_case(tag.as_str()))
+                    {
                         flush(&mut page, &mut current_block);
                         current_block = Block::new(depth.saturating_sub(1).min(6));
                     }
@@ -541,6 +625,69 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
         }
     }
     flush(&mut page, &mut current_block);
+
+    // Don't perform heuristic splitting here. Use the XML tags (EXAMPLE,
+    // ColloExa, GramExa, etc.) and the span.exabullet handling above to create
+    // separate blocks when the source XML intends them. This avoids splitting
+    // valid sentences like "The U.S. Constitution".
+
+    // Post-process only: convert leading circled numbers or bullets into
+    // `Inline::Prefix` so the renderer can place them in a prefix column.
+    fn is_circled(c: char) -> bool {
+        let u = c as u32;
+        (0x2460..=0x2473).contains(&u)
+    }
+    fn is_bullet(c: char) -> bool {
+        matches!(c, '•' | '●' | '\u{2022}' | '\u{25AA}' | '-' | '–' | '—')
+    }
+
+    for b in page.iter_mut() {
+        if b.inlines.is_empty() {
+            continue;
+        }
+        // Look at first inline; if it begins with a circled digit or bullet,
+        // split it out as a Prefix inline.
+        if let Inline::Text(s, st) = &mut b.inlines[0] {
+            // find first non-whitespace char index (byte index)
+            let mut byte_idx = None;
+            for (i, ch) in s.char_indices() {
+                if !ch.is_whitespace() {
+                    byte_idx = Some((i, ch));
+                    break;
+                }
+            }
+            if let Some((i, ch)) = byte_idx {
+                if is_circled(ch) {
+                    // prefix is the circled character (and a following space)
+                    let prefix = format!("{} ", ch);
+                    // compute rest of string after the circled char
+                    let next = i + ch.len_utf8();
+                    let rest = s[next..].trim_start().to_string();
+                    if rest.is_empty() {
+                        b.inlines.remove(0);
+                    } else {
+                        *s = rest;
+                    }
+                    // insert prefix with a sensible style
+                    b.inlines.insert(0, Inline::Prefix(prefix, style_pos()));
+                } else if is_bullet(ch) {
+                    // replace bullet with a triangular play bullet used on the site
+                    let prefix = "▶ ".to_string();
+                    // compute rest
+                    let next = i + ch.len_utf8();
+                    let rest = s[next..].trim_start().to_string();
+                    if rest.is_empty() {
+                        b.inlines.remove(0);
+                    } else {
+                        *s = rest;
+                    }
+                    b.inlines.insert(0, Inline::Prefix(prefix, style_dim()));
+                }
+            }
+        }
+    }
+
+    // Return the page as-is; do not heuristically split.
     page
 }
 
@@ -554,29 +701,29 @@ fn style_for_tag(tag: &str, attrs: &[(String, String)]) -> Style {
         "FIELD" | "REGISTERLAB" | "ACTIV" => style_label(),
         // Frequency badges (S1, W1, etc.) — bright green bold so they stand out
         "FREQ" => Style::default()
-            .fg(Color::Green)
+            .fg(rgb(162, 255, 153))
             .add_modifier(Modifier::BOLD),
-        // Grammar labels like [countable] — cyan
-        "GRAM" => Style::default().fg(Color::Cyan),
+        // Grammar labels like [countable] — use yellow
+        "GRAM" => Style::default().fg(rgb(255, 255, 128)),
         // Pronunciation text — yellow so it's distinct from definition text
-        "PRON" => Style::default().fg(Color::Yellow),
-        // Main section heading (COLLOCATIONS, THESAURUS, …) — green bold
+        "PRON" => Style::default().fg(rgb(255, 255, 128)),
+        // Main section heading (COLLOCATIONS, THESAURUS, …) — bright green bold
         "HEADING" => Style::default()
-            .fg(Color::Green)
+            .fg(rgb(162, 255, 153))
             .add_modifier(Modifier::BOLD),
         "SECHEADING" => style_heading(),
         // Signpost labels in entries (e.g. "■ CAR JOURNEY")
         "SIGNPOST" => Style::default()
-            .fg(Color::Yellow)
+            .fg(rgb(255, 255, 128))
             .add_modifier(Modifier::BOLD),
         // Collocation-specific tags
         "coll-head" => Style::default().add_modifier(Modifier::BOLD),
-        "coll-note" => Style::default().fg(Color::DarkGray),
+        "coll-note" => Style::default().fg(rgb(121, 112, 169)),
         // COLLO marks the specific collocating word inside an example
         "COLLO" => Style::default().add_modifier(Modifier::BOLD),
         "span" => match attr_get(attrs, "class").as_deref() {
             Some("sensenum") => Style::default()
-                .fg(Color::Yellow)
+                .fg(rgb(255, 255, 128))
                 .add_modifier(Modifier::BOLD),
             Some("heading") => style_heading(),
             Some("def") => style_def(),

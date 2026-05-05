@@ -468,6 +468,9 @@ impl App {
                             ));
                             col += btn_width;
                         }
+                        crate::content::Inline::Prefix(p, _) => {
+                            col += p.chars().count();
+                        }
                         crate::content::Inline::Text(t, _) => {
                             col += t.chars().count();
                         }
@@ -610,6 +613,7 @@ impl App {
                     .filter_map(|il| match il {
                         crate::content::Inline::Text(t, _) => Some(t.as_str()),
                         crate::content::Inline::Headword(t) => Some(t.as_str()),
+                        crate::content::Inline::Prefix(p, _) => Some(p.as_str()),
                         _ => None,
                     })
                     .collect::<Vec<_>>()
@@ -671,7 +675,9 @@ impl App {
         for block in page.iter().take(3) {
             for inline in &block.inlines {
                 match inline {
-                    crate::content::Inline::Text(t, _) | crate::content::Inline::Headword(t) => {
+                    crate::content::Inline::Text(t, _)
+                    | crate::content::Inline::Headword(t)
+                    | crate::content::Inline::Prefix(t, _) => {
                         if header.is_empty() {
                             header.push_str(t);
                         } else {
