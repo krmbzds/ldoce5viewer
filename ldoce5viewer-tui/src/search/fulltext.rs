@@ -182,12 +182,30 @@ impl FulltextSearcher {
         if !dir.exists() {
             return Err(FulltextError::IndexNotFound);
         }
-        let s = build_schema();
-        let index = match Index::open_in_dir(dir) {
-            Ok(idx) => idx,
-            Err(_) => return Err(FulltextError::IndexNotFound),
-        };
+        // Open first so we read the schema that was actually stored on disk.
+        // Do NOT call build_schema() before this — the Field handles MUST come
+        // from the index's own schema object, otherwise QueryParser will reject
+        // them (it validates fields against the index's internal registry).
+        let index = Index::open_in_dir(dir)?;
         make_analyzer(&index);
+
+        // Derive field handles from the on-disk schema. If any expected field
+        // is absent the index is from an incompatible version; surface a clear
+        // error rather than panicking later.
+        let schema = index.schema();
+        let get_field = |name: &str| -> Result<Field, FulltextError> {
+            schema.get_field(name).map_err(|_| FulltextError::IndexNotFound)
+        };
+        let s = LdoceSchema {
+            schema:   schema.clone(),
+            content:  get_field("content")?,
+            label:    get_field("label")?,
+            path:     get_field("path")?,
+            prio:     get_field("prio")?,
+            sortkey:  get_field("sortkey")?,
+            itemtype: get_field("itemtype")?,
+            asfilter: get_field("asfilter")?,
+        };
         Ok(FulltextSearcher { index, s })
     }
 
