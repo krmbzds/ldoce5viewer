@@ -116,11 +116,14 @@ fn parse_cft(path: &Path) -> Result<(HashMap<String, (usize, usize)>, usize), Ar
         // Format: `<field_name_expr> = <TYPE>`
         if let Some((lhs, rhs)) = line.split_once('=') {
             let field_name = lhs.split(',').next().unwrap_or("").trim().to_lowercase();
-            let size = field_type_size(rhs.trim()).ok_or_else(|| {
-                ArchiveError::Broken(format!("unknown type '{}' in {:?}", rhs.trim(), path))
-            })?;
-            offsets.insert(field_name, (offset, size));
-            offset += size;
+            // Only accept known IDM types; ignore unknown lines (matches Python behaviour)
+            if let Some(size) = field_type_size(rhs.trim()) {
+                offsets.insert(field_name, (offset, size));
+                offset += size;
+            } else {
+                // Unknown/irrelevant type (e.g. `NAME.tda = files.dat`) — skip
+                continue;
+            }
         }
     }
     Ok((offsets, offset))

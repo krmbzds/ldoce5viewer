@@ -477,12 +477,12 @@ impl App {
                     .inlines
                     .iter()
                     .filter_map(|il| {
-                        if let crate::content::Inline::Text(t, _) = il {
-                            Some(t.as_str())
-                        } else {
-                            None
-                        }
-                    })
+                            match il {
+                                crate::content::Inline::Text(t, _) => Some(t.as_str()),
+                                crate::content::Inline::Headword(t) => Some(t.as_str()),
+                                _ => None,
+                            }
+                        })
                     .collect::<Vec<_>>()
                     .join("");
                 if text.to_lowercase().contains(&q) {
@@ -538,7 +538,7 @@ impl App {
         for block in page.iter().take(3) {
             for inline in &block.inlines {
                 match inline {
-                    crate::content::Inline::Text(t, _) => {
+                    crate::content::Inline::Text(t, _) | crate::content::Inline::Headword(t) => {
                         if header.is_empty() { header.push_str(t); }
                         else { meaning.push_str(t); }
                     }

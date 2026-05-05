@@ -23,6 +23,9 @@ use crate::content::types::ContentType;
 pub enum Inline {
     /// Styled plain text.
     Text(String, Style),
+    /// Headword text (semantic variant) — used to identify the main headword
+    /// and to render it specially in the title of the content view.
+    Headword(String),
     /// An audio playback button:  `♪ <title>`.
     AudioButton { path: String, title: String },
     /// An image placeholder.
@@ -48,9 +51,36 @@ impl Block {
     }
 
     fn push_text(&mut self, text: &str, style: Style) {
-        if !text.is_empty() {
-            self.inlines.push(Inline::Text(text.to_owned(), style));
+        if text.is_empty() { return; }
+        // If the last inline is text with the same style, append to it (inserting a
+        // space when needed).
+        if let Some(last) = self.inlines.last_mut() {
+            if let Inline::Text(last_text, last_style) = last {
+                if *last_style == style {
+                    let need_space = last_text.chars().rev().next().map(|c| c.is_alphanumeric()).unwrap_or(false)
+                        && text.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false);
+                    if need_space { last_text.push(' '); }
+                    last_text.push_str(text);
+                    return;
+                }
+            }
         }
+        self.inlines.push(Inline::Text(text.to_owned(), style));
+    }
+
+    fn push_headword(&mut self, text: &str) {
+        if text.is_empty() { return; }
+        if let Some(last) = self.inlines.last_mut() {
+            if let Inline::Headword(last_text) = last {
+                // choose to insert a space when joining two alphanumeric tokens
+                let need_space = last_text.chars().rev().next().map(|c| c.is_alphanumeric()).unwrap_or(false)
+                    && text.chars().next().map(|c| c.is_alphanumeric()).unwrap_or(false);
+                if need_space { last_text.push(' '); }
+                last_text.push_str(text);
+                return;
+            }
+        }
+        self.inlines.push(Inline::Headword(text.to_owned()));
     }
 }
 
@@ -90,6 +120,9 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
             match inline {
                 Inline::Text(text, style) => {
                     current.push(Span::styled(text.clone(), *style));
+                }
+                Inline::Headword(text) => {
+                    current.push(Span::styled(text.clone(), style_headword()));
                 }
                 Inline::AudioButton { title, .. } => {
                     current.push(Span::styled(format!("♪[{title}]"), style_audio()));
@@ -309,7 +342,14 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                         continue;
                     }
                 }
-                current_block.push_text(text, style);
+
+                // If any ancestor tag is HWD or BASE treat this text as headword
+                let is_headword = stack.iter().rev().any(|(t, _, _)| t == "HWD" || t == "BASE");
+                if is_headword {
+                    current_block.push_headword(text);
+                } else {
+                    current_block.push_text(text, style);
+                }
             }
         }
     }
@@ -786,6 +826,7 @@ mod tests {
             .flat_map(|b| b.inlines.iter())
             .filter_map(|i| match i {
                 Inline::Text(t, _) => Some(t.as_str()),
+                Inline::Headword(t) => Some(t.as_str()),
                 _ => None,
             })
             .collect();
@@ -811,6 +852,7 @@ mod tests {
             .flat_map(|b| b.inlines.iter())
             .filter_map(|i| match i {
                 Inline::Text(t, _) => Some(t.as_str()),
+                Inline::Headword(t) => Some(t.as_str()),
                 _ => None,
             })
             .collect();
@@ -837,7 +879,7 @@ mod tests {
         let page = transform_examples(xml);
         let all_text: String = page.iter()
             .flat_map(|b| b.inlines.iter())
-            .filter_map(|i| if let Inline::Text(t, _) = i { Some(t.as_str()) } else { None })
+            .filter_map(|i| match i { Inline::Text(t, _) => Some(t.as_str()), Inline::Headword(t) => Some(t.as_str()), _ => None })
             .collect();
         assert!(all_text.contains("run"));
         assert!(all_text.contains("ran"));
@@ -849,7 +891,7 @@ mod tests {
         let page = transform_etymologies(xml);
         let all_text: String = page.iter()
             .flat_map(|b| b.inlines.iter())
-            .filter_map(|i| if let Inline::Text(t, _) = i { Some(t.as_str()) } else { None })
+            .filter_map(|i| match i { Inline::Text(t, _) => Some(t.as_str()), Inline::Headword(t) => Some(t.as_str()), _ => None })
             .collect();
         assert!(all_text.contains("Latin"));
     }

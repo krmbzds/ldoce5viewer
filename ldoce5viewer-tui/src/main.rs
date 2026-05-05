@@ -438,36 +438,55 @@ fn load_entry(app: &mut App, path: &str) {
         Err(e) => { app.status = format!("Filemap error: {e}"); return; }
     };
 
-    let key = cid.id.as_bytes();
+    // The filemap keys are the first 10 bytes of MD5(archive + ":" + name)
+    // Compute the same lookup key here (mirrors Python FilemapReader.lookup)
+    let md = md5::compute(format!("{}:{}", archive, cid.id));
+    let key = &md[0..10];
     let val = match reader.get(key) {
         Some(v) => v,
         None    => { app.status = format!("Entry not found: {}", cid.id); return; }
     };
 
-    // val = b"<archive>/<relative-filename>"
-    let location_str = String::from_utf8_lossy(&val);
-    let (archive_name, filename) = match location_str.split_once('/') {
-        Some(p) => p,
-        None    => { app.status = "Malformed filemap entry.".to_owned(); return; }
+    // The CDB stores the binary location tuple (cmp_offset, cmp_size, orig_offset, orig_size)
+    // encoded as either <IIII> (16 bytes) or <IHHH> (10 bytes). Decode it here and read
+    // the corresponding file block directly from the archive.
+    let (cmpo, cmps, orgo, orgs) = match val.len() {
+        16 => {
+            let a: [u8; 4] = val[0..4].try_into().unwrap();
+            let b: [u8; 4] = val[4..8].try_into().unwrap();
+            let c: [u8; 4] = val[8..12].try_into().unwrap();
+            let d: [u8; 4] = val[12..16].try_into().unwrap();
+            (
+                u32::from_le_bytes(a) as u64,
+                u32::from_le_bytes(b) as u64,
+                u32::from_le_bytes(c) as u64,
+                u32::from_le_bytes(d) as u64,
+            )
+        }
+        10 => {
+            let a: [u8; 4] = val[0..4].try_into().unwrap();
+            let b: [u8; 2] = val[4..6].try_into().unwrap();
+            let c: [u8; 2] = val[6..8].try_into().unwrap();
+            let d: [u8; 2] = val[8..10].try_into().unwrap();
+            (
+                u32::from_le_bytes(a) as u64,
+                u16::from_le_bytes(b) as u64,
+                u16::from_le_bytes(c) as u64,
+                u16::from_le_bytes(d) as u64,
+            )
+        }
+        _ => {
+            app.status = "Malformed filemap entry.".to_owned();
+            return;
+        }
     };
 
-    // Look up the file location from the archive
-    let entries = match list_files(&data_dir, archive_name) {
-        Ok(e)  => e,
-        Err(e) => { app.status = format!("Archive list error: {e}"); return; }
-    };
-
-    let entry = match entries.iter().find(|e| e.name == filename) {
-        Some(e) => e.clone(),
-        None    => { app.status = format!("File not found in archive: {filename}"); return; }
-    };
-
-    let mut arch_reader = match ArchiveReader::new(&data_dir, archive_name) {
+    let mut arch_reader = match ArchiveReader::new(&data_dir, archive) {
         Ok(r)  => r,
         Err(e) => { app.status = format!("Archive reader error: {e}"); return; }
     };
 
-    let xml_bytes = match arch_reader.read(entry.location) {
+    let xml_bytes = match arch_reader.read((cmpo, cmps, orgo, orgs)) {
         Ok(b)  => b,
         Err(e) => { app.status = format!("Read error: {e}"); return; }
     };

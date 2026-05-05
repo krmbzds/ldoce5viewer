@@ -27,7 +27,17 @@ impl<'a> Widget for ContentView<'a> {
             Style::default().fg(Color::DarkGray)
         };
 
-        let title = if let Some(path) = &self.app.current_path {
+        // Prefer a human-friendly headword title from the rendered page when
+        // available; fall back to the final path component.
+        let title = if let Some(page) = &self.app.content_page {
+            if let Some(hw) = extract_headword(page) {
+                format!(" {} ", hw)
+            } else if let Some(path) = &self.app.current_path {
+                format!(" {} ", path_to_title(path))
+            } else {
+                " Content ".to_owned()
+            }
+        } else if let Some(path) = &self.app.current_path {
             format!(" {} ", path_to_title(path))
         } else {
             " Content ".to_owned()
@@ -44,11 +54,17 @@ impl<'a> Widget for ContentView<'a> {
         if inner.height == 0 || inner.width == 0 { return; }
 
         if let Some(page) = &self.app.content_page {
-            let text = build_ratatui_text(page, &self.app.find_text, &self.app.find_matches);
+            // Render using the pre-built Text; avoid remapping blocks → lines which
+            // previously caused clipping and incorrect scrolling. We clamp the
+            // requested scroll to the number of rendered lines so scrolling behaves
+            // sensibly even when the content wraps to multiple lines.
+            let text = to_ratatui_text(page);
+            let total_lines = text.lines.len();
+            let scroll_y = if total_lines == 0 { 0 } else { self.app.content_scroll.min(total_lines.saturating_sub(1)) } as u16;
 
             Paragraph::new(text)
                 .wrap(Wrap { trim: false })
-                .scroll((self.app.content_scroll as u16, 0))
+                .scroll((scroll_y, 0))
                 .render(inner, buf);
         } else {
             // Show a help message when no content is loaded
@@ -123,13 +139,15 @@ fn build_ratatui_text<'t>(
     let mut lines: Vec<Line> = Vec::new();
     for (block_idx, block) in page.iter().enumerate() {
         let block_text: String = block
-            .inlines
-            .iter()
-            .filter_map(|i| {
-                if let Inline::Text(t, _) = i { Some(t.as_str()) } else { None }
-            })
-            .collect::<Vec<_>>()
-            .join("");
+        .inlines
+        .iter()
+        .filter_map(|i| match i {
+            Inline::Text(t, _) => Some(t.as_str()),
+            Inline::Headword(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
         if match_set.contains(&block_idx) && !q.is_empty() {
             // Highlight all occurrences of `q` within the block
@@ -171,6 +189,19 @@ fn build_ratatui_text<'t>(
 
 fn path_to_title(path: &str) -> &str {
     path.trim_start_matches('/').split('/').last().unwrap_or(path)
+}
+
+fn extract_headword(page: &[crate::content::transform::Block]) -> Option<String> {
+    // Find the first Inline::Headword and return it.
+    for block in page {
+        for inline in &block.inlines {
+            if let crate::content::transform::Inline::Headword(text) = inline {
+                let s = text.trim();
+                if !s.is_empty() { return Some(s.to_string()); }
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]
