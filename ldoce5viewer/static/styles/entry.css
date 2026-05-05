@@ -306,3 +306,54 @@ span.heading {
 .sensenum { margin-left: -1.6em; }
 } /* end of @media print */
 
+@media (prefers-color-scheme: dark) {
+.propform, .propformprep, .collo, .thespropform { color: #ce9178; }
+.hint { border-color: #555; }
+.synopp { background-color: #883300; }
+.pron, .amevarpron { color: #aaa; }
+.sensenum { color: #4ec9b0; }
+.signpost { background-color: #2d5f5f; }
+.lexunit, .sense .lexvar { color: #ce9178; }
+.example { color: #bbbbbb; }
+.crossref a { color: #ce9178; border-bottom-color: #6d5040; }
+.crossref a:hover { color: #f48771; }
+.phrvbhwd { color: #ce9178; }
+div.heading {
+    background-color: #404040;
+    background: linear-gradient(#585858, #404040);
+}
+.grambox span.heading { background-color: #666; color: white; }
+.secheading { background-color: #565656; }
+.thesbox { border-color: #3d6f6f; }
+.thesbox div.heading { background: linear-gradient(#3d7070, #2d5555); }
+.thesbox .secheading { background-color: #4d7f7f; }
+.thesbox .thesexa .base { color: #4ec9b0; }
+.collobox { border-color: #2d7a55; }
+.collobox div.heading { background: linear-gradient(#2d7a55, #246644); }
+.collobox .secheading { background-color: #3d8a65; }
+.collobox .collexa .base { color: #4ec9b0; }
+a.nondv { border-bottom-color: #6d5040; }
+.warning { color: #e07030; }
+.assets { background: #2d2d2d; }
+.assethead { color: #aaa; }
+.lexunit:target,
+.lexvar:target,
+.orthvar:target,
+.propform:target,
+.propformprep:target,
+.collo:target,
+.example:target,
+.colloc:target,
+.deriv:target,
+.phrvbentry:target .phrvbhwd {
+    background: linear-gradient(#3a3a00, #303000);
+    box-shadow: 0 0 8px #404010;
+}
+.sense:target,
+.collocate:target,
+.exponent:target {
+    background: linear-gradient(#2e2e00, #282800);
+    box-shadow: 0 0 8px #383800;
+}
+} /* end of @media (prefers-color-scheme: dark) */
+
