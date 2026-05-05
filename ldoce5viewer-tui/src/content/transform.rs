@@ -127,11 +127,8 @@ pub fn to_ratatui_text(page: &[Block]) -> Text<'static> {
                 Inline::AudioButton { title, .. } => {
                     current.push(Span::styled(format!("♪[{title}]"), style_audio()));
                 }
-                Inline::Image { filename } => {
-                    current.push(Span::styled(
-                        format!("[img: {filename}]"),
-                        Style::default().fg(Color::Yellow),
-                    ));
+                Inline::Image { .. } => {
+                    // Images cannot be rendered in a TUI; skip silently.
                 }
                 Inline::Link { text, .. } => {
                     current.push(Span::styled(text.clone(), style_ref()));
@@ -221,6 +218,34 @@ fn attr_get(attrs: &[(String, String)], key: &str) -> Option<String> {
     attrs.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
 }
 
+/// Strip LDOCE5 inline audio-cue markers from a text node.
+///
+/// LDOCE5 XML embeds example-level audio cues as `¿[Play]`, `¿[British]`,
+/// `¿[American]` etc. — literal text nodes starting with U+00BF (`¿`) followed
+/// by a `[…]` tag.  These have no displayable meaning in the TUI and must be
+/// removed before the text is added to a content block.
+fn strip_audio_markers(text: &str) -> std::borrow::Cow<str> {
+    const ZAP: char = '\u{00BF}'; // inverted question mark used as LDOCE5 marker
+    if !text.contains(ZAP) {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let mut result = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == ZAP {
+            // Consume the optional [...] payload that follows
+            if chars.peek() == Some(&'[') {
+                for c in chars.by_ref() {
+                    if c == ']' { break; }
+                }
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    std::borrow::Cow::Owned(result)
+}
+
 // --------------------------------------------------------------------------
 // Entry transformer
 // --------------------------------------------------------------------------
@@ -245,7 +270,7 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
         "Entry", "Head", "Sense", "Subsense", "EXAMPLE", "GramExa",
         "ColloExa", "Deriv", "RunOn", "PhrVbEntry", "GramBox", "Exponent",
         "Section", "SECHEADING", "SpokenSect", "ThesBox", "ColloBox",
-        "F2NBox", "Crossref", "Hint",
+        "F2NBox", "Crossref", "Hint", "ColloGram",
     ].iter().copied().collect();
 
     let skip_tags: std::collections::HashSet<&str> = [
@@ -329,6 +354,10 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
             }
 
             XmlNode::Text(text) => {
+                // Strip LDOCE5 inline audio-cue markers (¿[Play], ¿[British], …)
+                let filtered = strip_audio_markers(text);
+                let text = filtered.as_ref();
+
                 // Find the innermost non-skip style
                 let style = stack.iter().rev()
                     .find(|(t, _, _)| !skip_tags.contains(t.as_str()))
@@ -338,13 +367,18 @@ pub fn transform_entry(xml: &[u8]) -> ContentPage {
                 // If the last inline is a Link with empty text, fill it
                 if let Some(Inline::Link { text: lt, .. }) = current_block.inlines.last_mut() {
                     if lt.is_empty() {
-                        *lt = text.clone();
+                        *lt = text.to_owned();
                         continue;
                     }
                 }
 
-                // If any ancestor tag is HWD or BASE treat this text as headword
-                let is_headword = stack.iter().rev().any(|(t, _, _)| t == "HWD" || t == "BASE");
+                // Treat text as a headword only when directly inside HWD/BASE
+                // and NOT inside an INFLX subtree (which contains inflected forms
+                // we do not want merged into the entry title).
+                let inside_inflx = stack.iter().rev()
+                    .any(|(t, _, _)| t == "INFLX" || t == "SE_EntryAssets");
+                let is_headword = !inside_inflx
+                    && stack.iter().rev().any(|(t, _, _)| t == "HWD" || t == "BASE");
                 if is_headword {
                     current_block.push_headword(text);
                 } else {
@@ -366,8 +400,23 @@ fn style_for_tag(tag: &str, attrs: &[(String, String)]) -> Style {
         | "ColloExa"            => style_example(),
         "Ref" | "NonDV"         => style_ref(),
         "FIELD" | "REGISTERLAB"
-        | "ACTIV" | "FREQ"      => style_label(),
+        | "ACTIV"               => style_label(),
+        // Frequency badges (S1, W1, etc.) — bright green bold so they stand out
+        "FREQ"                  => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+        // Grammar labels like [countable] — cyan
+        "GRAM"                  => Style::default().fg(Color::Cyan),
+        // Pronunciation text — yellow so it's distinct from definition text
+        "PRON"                  => Style::default().fg(Color::Yellow),
+        // Main section heading (COLLOCATIONS, THESAURUS, …) — green bold
+        "HEADING"               => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
         "SECHEADING"            => style_heading(),
+        // Signpost labels in entries (e.g. "■ CAR JOURNEY")
+        "SIGNPOST"              => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        // Collocation-specific tags
+        "coll-head"             => Style::default().add_modifier(Modifier::BOLD),
+        "coll-note"             => Style::default().fg(Color::DarkGray),
+        // COLLO marks the specific collocating word inside an example
+        "COLLO"                 => Style::default().add_modifier(Modifier::BOLD),
         "span" => {
             match attr_get(attrs, "class").as_deref() {
                 Some("sensenum")  => Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),

@@ -30,7 +30,11 @@ fn entry_xml(hwd: &str, pos: &str, def: &str, example: &str) -> Vec<u8> {
 fn all_text(page: &[Block]) -> String {
     page.iter()
         .flat_map(|b| b.inlines.iter())
-        .filter_map(|i| if let Inline::Text(t, _) = i { Some(t.as_str()) } else { None })
+        .filter_map(|i| match i {
+            Inline::Text(t, _)  => Some(t.as_str()),
+            Inline::Headword(t) => Some(t.as_str()),
+            _ => None,
+        })
         .collect()
 }
 
@@ -156,8 +160,62 @@ fn test_phrases_produces_blocks() {
 }
 
 // --------------------------------------------------------------------------
-// to_ratatui_text
+// New rendering-parity tests
 // --------------------------------------------------------------------------
+
+/// INFLX subtree must NOT contribute text to headword inlines — otherwise the
+/// entry title shows "car cars car" instead of just "car".
+#[test]
+fn test_inflx_content_excluded_from_headword() {
+    let xml = br#"<Entry>
+      <Head>
+        <HWD>car</HWD>
+        <INFLX><BASE>cars</BASE></INFLX>
+      </Head>
+    </Entry>"#;
+    let page = transform_entry(xml);
+    // The headword inline should only contain "car", not "car cars"
+    let headword_text: String = page.iter()
+        .flat_map(|b| b.inlines.iter())
+        .filter_map(|i| if let Inline::Headword(t) = i { Some(t.as_str()) } else { None })
+        .collect();
+    assert!(headword_text.contains("car"),  "headword 'car' should be present");
+    assert!(!headword_text.contains("cars"), "INFLX 'cars' must NOT appear in headword inline");
+}
+
+/// ¿[Play], ¿[British], ¿[American] markers must be stripped from text output.
+#[test]
+fn test_audio_markers_stripped() {
+    let xml = b"<Entry><Sense><EXAMPLE>\xC2\xBF[Play]She ran fast.</EXAMPLE></Sense></Entry>";
+    let page = transform_entry(xml);
+    let text = all_text(&page);
+    assert!(text.contains("She ran fast."), "example text must survive stripping");
+    assert!(!text.contains('\u{00BF}'), "inverted-question-mark marker must be stripped");
+    assert!(!text.contains("[Play]"),    "[Play] marker must be stripped");
+}
+
+/// Each ColloGram entry must produce its own block, not merge into one long line.
+#[test]
+fn test_collograms_are_separate_blocks() {
+    let xml = br#"<Entry>
+      <ColloBox>
+        <Section>
+          <ColloGram>
+            <coll-head>drive a car</coll-head>
+            <ColloExa>She drove the car home.</ColloExa>
+          </ColloGram>
+          <ColloGram>
+            <coll-head>park a car</coll-head>
+            <ColloExa>He parked the car by the road.</ColloExa>
+          </ColloGram>
+        </Section>
+      </ColloBox>
+    </Entry>"#;
+    let page = transform_entry(xml);
+    // There should be at least 4 blocks: 2 × (coll-head block + ColloExa block)
+    assert!(page.len() >= 4, "expected ≥4 blocks for 2 ColloGram entries, got {}", page.len());
+}
+
 
 #[test]
 fn test_to_ratatui_text_line_count() {

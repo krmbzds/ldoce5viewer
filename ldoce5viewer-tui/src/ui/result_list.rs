@@ -63,8 +63,7 @@ impl<'a> Widget for ResultList<'a> {
 
 fn render_result_item(item: &SearchResultItem, _selected: bool) -> ListItem<'static> {
     // Parse the lightweight markup in `item.label` into text+style parts, then
-    // split into tokens, collapse adjacent duplicate tokens (case-insensitive),
-    // and re-merge tokens into styled spans for rendering.
+    // split into tokens and apply deduplication.
     let parts = parse_label_to_spans(&item.label);
 
     // Flatten parts into per-token (token, style) pairs
@@ -75,7 +74,16 @@ fn render_result_item(item: &SearchResultItem, _selected: bool) -> ListItem<'sta
         }
     }
 
-    // Collapse adjacent duplicate tokens (case-insensitive)
+    // Remove a plain-text prefix that duplicates the beginning of the styled
+    // (markup) portion.  LDOCE5 labels are often stored as
+    //   "car alarm <hw>car alarm</hw> <p>noun</p>"
+    // i.e. the plaintext headword appears before its own markup.  After
+    // token-splitting the default-styled "car alarm" comes before the hw-styled
+    // "car alarm", and the result list shows "car alarm car alarm noun".
+    let tokens = remove_plain_prefix(tokens);
+
+    // Collapse adjacent duplicate tokens (case-insensitive) as a secondary
+    // safety net for any remaining repetition.
     let mut deduped: Vec<(String, Style)> = Vec::new();
     for (tok, style) in tokens {
         if deduped.last().map(|(p, _)| p.eq_ignore_ascii_case(&tok)).unwrap_or(false) {
@@ -109,17 +117,36 @@ fn render_result_item(item: &SearchResultItem, _selected: bool) -> ListItem<'sta
     ListItem::new(Line::from(spans_out))
 }
 
-fn collapse_adjacent_duplicates(s: &str) -> String {
-    let mut out: Vec<String> = Vec::new();
-    for tok in s.split_whitespace() {
-        if out.last().map(|p| p.eq_ignore_ascii_case(tok)).unwrap_or(false) {
-            // skip duplicate
-            continue;
-        }
-        out.push(tok.to_string());
+/// Remove a leading run of default-styled tokens that is immediately repeated
+/// in the non-default-styled tokens that follow.
+///
+/// Example: `["car"(plain), "alarm"(plain), "car"(hw), "alarm"(hw), "noun"(pos)]`
+/// → `["car"(hw), "alarm"(hw), "noun"(pos)]`
+fn remove_plain_prefix(mut tokens: Vec<(String, Style)>) -> Vec<(String, Style)> {
+    if tokens.len() < 2 {
+        return tokens;
     }
-    out.join(" ")
+    let default_style = Style::default();
+    // Count leading default-styled tokens
+    let prefix_end = tokens
+        .iter()
+        .take_while(|(_, s)| *s == default_style)
+        .count();
+    if prefix_end == 0 || tokens.len() < prefix_end * 2 {
+        return tokens;
+    }
+    // Check whether tokens[0..prefix_end] matches tokens[prefix_end..prefix_end*2]
+    // (case-insensitive word comparison)
+    let matches = tokens[..prefix_end]
+        .iter()
+        .zip(tokens[prefix_end..prefix_end * 2].iter())
+        .all(|((t1, _), (t2, _))| t1.eq_ignore_ascii_case(t2));
+    if matches {
+        tokens.drain(..prefix_end);
+    }
+    tokens
 }
+
 
 fn parse_label_to_spans(s: &str) -> Vec<(String, Style)> {
     // Simple tag -> style mapping. Only a small subset of tags used by the
@@ -186,28 +213,48 @@ fn parse_label_to_spans(s: &str) -> Vec<(String, Style)> {
     parts
 }
 
-/// Remove `<tag>` and `</tag>` markup from a label string.
-fn strip_markup(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for ch in s.chars() {
-        match ch {
-            '<' => { in_tag = true; }
-            '>' => { in_tag = false; }
-            _   => { if !in_tag { out.push(ch); } }
-        }
-    }
-    out
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_strip_markup() {
-        assert_eq!(strip_markup("Hello <b>World</b>!"), "Hello World!");
-        assert_eq!(strip_markup("<hw>run</hw>  <pos>verb</pos>"), "run  verb");
-        assert_eq!(strip_markup("plain text"), "plain text");
+    fn test_remove_plain_prefix_compound() {
+        // Simulates label "car alarm <hw>car alarm</hw> <pos>noun</pos>"
+        let hw_style  = Style::default().fg(ratatui::style::Color::Cyan)
+            .add_modifier(ratatui::style::Modifier::BOLD);
+        let pos_style = Style::default().fg(ratatui::style::Color::Yellow);
+        let tokens = vec![
+            ("car".to_string(),   Style::default()),
+            ("alarm".to_string(), Style::default()),
+            ("car".to_string(),   hw_style),
+            ("alarm".to_string(), hw_style),
+            ("noun".to_string(),  pos_style),
+        ];
+        let result = remove_plain_prefix(tokens);
+        assert_eq!(result.len(), 3, "plain prefix should be removed");
+        assert_eq!(result[0].0, "car");
+        assert_eq!(result[0].1, hw_style);
+    }
+
+    #[test]
+    fn test_remove_plain_prefix_single_no_change() {
+        // Single-word label with no markup prefix — must stay unchanged
+        let tokens = vec![("Caracas".to_string(), Style::default())];
+        let result = remove_plain_prefix(tokens.clone());
+        assert_eq!(result, tokens);
+    }
+
+    #[test]
+    fn test_remove_plain_prefix_no_plain_prefix() {
+        // Label that starts directly with a styled token — no change
+        let hw_style = Style::default().fg(ratatui::style::Color::Cyan)
+            .add_modifier(ratatui::style::Modifier::BOLD);
+        let tokens = vec![
+            ("run".to_string(), hw_style),
+            ("verb".to_string(), Style::default().fg(ratatui::style::Color::Yellow)),
+        ];
+        let result = remove_plain_prefix(tokens.clone());
+        assert_eq!(result, tokens);
     }
 }
