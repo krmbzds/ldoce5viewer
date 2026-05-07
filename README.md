@@ -1,4 +1,4 @@
-# LDOCE5 Viewer (PySide6, Python3, Qt6, HiDPI, Dark Mode)
+# LDOCE5 Viewer ![PySide6](https://img.shields.io/badge/PySide6-41CD52?style=plastic&logo=qt&logoColor=white) ![Python3](https://img.shields.io/badge/Python3-3776AB?style=plastic&logo=python&logoColor=FFD43B) ![Qt6](https://img.shields.io/badge/Qt6-41CD52?style=plastic&logo=qt&logoColor=white) ![HiDPI](https://img.shields.io/badge/HiDPI-6A5ACD?style=plastic&logo=monitor&logoColor=white) ![Dark Mode](https://img.shields.io/badge/Dark%20Mode-1E1E1E?style=plastic&logo=darkreader&logoColor=white)
 
 The LDOCE5 Viewer is an alternative dictionary viewer for the Longman Dictionary of Contemporary English 5th Edition (LDOCE 5).
 
