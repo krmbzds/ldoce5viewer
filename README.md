@@ -4,7 +4,7 @@
 
 The LDOCE5 Viewer is an alternative dictionary viewer for the Longman Dictionary of Contemporary English 5th Edition (LDOCE 5).
 
-![image](https://cloud.githubusercontent.com/assets/15828926/24585732/efb068a4-17bb-11e7-8294-7241f73d9ed8.png)
+![image](https://github.com/user-attachments/assets/3547e025-40e1-405d-9017-d8887336001c)
 
 It runs on macOS (Intel, arm), Linux and Microsoft Windows.
 
