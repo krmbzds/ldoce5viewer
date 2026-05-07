@@ -1,6 +1,4 @@
-# LDOCE5 Viewer (PySide6, Python 3, Qt6)
-
------
+# LDOCE5 Viewer (PySide6, Python3, Qt6, HiDPI, Dark Mode)
 
 The LDOCE5 Viewer is an alternative dictionary viewer for the Longman Dictionary of Contemporary English 5th Edition (LDOCE 5).
 
@@ -9,8 +7,6 @@ The LDOCE5 Viewer is an alternative dictionary viewer for the Longman Dictionary
 It runs on macOS (Intel, arm), Linux and Microsoft Windows.
 
 This software is free and open source software licensed under the terms of GPLv3.
-
----
 
 ## Development
 
@@ -34,8 +30,6 @@ pytest tests/ -v
 
 All tests under `tests/` are pure-Python and exercise non-GUI subsystems
 (CDB, incremental index, fulltext search).  They run without a display server.
-
----
 
 ## Manual steps requiring a local Qt environment
 
@@ -135,7 +129,8 @@ rm -rf "$STAGE"
 ls -lh "$DIST/LDOCE5 Viewer.dmg"
 ```
 
-Notes
+## Notes
+
 - If you prefer a prettier DMG (background image, Applications link) install `create-dmg` (Homebrew) and replace the `hdiutil` step with the `create-dmg` invocation.
 - When building the .app, ensure `PyInstaller` and `PySide6` are installed into the same Python environment you use for `make` (e.g. via `python -m pip install PySide6 pyinstaller`).
 
